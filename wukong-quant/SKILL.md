@@ -25,6 +25,10 @@ prerequisites:
 | 悟空，今日市场总结 / 悟空，大盘分析 | 获取 AI 大盘分析（情绪/板块/资金/风险，交易日三次自动更新） |
 | 悟空，全球市场 / 悟空，外盘简报 | 获取全球市场简报（美股/港股/外汇/大宗/宏观联动） |
 | 悟空，热股分析 / 悟空，今日热股 | 获取当日最新热股榜 AI 分析（同花顺/东方财富） |
+| 悟空，宏观分析 / 悟空，中国宏观 | 获取中国宏观 AI 深度分析（PMI/CPI/PPI/M2/GDP/LPR） |
+| 悟空，美国宏观 / 悟空，美联储 | 获取美国利率市场深度分析 |
+| 悟空，板块分析 / 悟空，今日概念 | 获取最新板块/概念 AI 分析（盘中热门方向点评） |
+| 悟空，财报信号 / 悟空，业绩异动 | 扫描近期业绩预告/快报/券商评级上调信号 |
 | 悟空，查 {股票代码} 的历史分析 | 查最近历史分析 |
 
 ## 深度分析工作流
@@ -77,6 +81,15 @@ prerequisites:
 - **热股分析**：调用 `mcp_wukong_quant_hermes_hot_stock`（可选参数 `source=ths`（默认）或 `source=dc`）
   - 返回：`analysis`（AI 全文点评）、`rank_time`（榜单时刻）、`stock_count`、`trade_date`
   - 原文完整输出 `analysis` 内容，不得压缩
+- **宏观 AI 分析**：调用 `mcp_wukong_quant_hermes_macro_analysis`（可选参数 `scope=china_macro`（默认）或 `scope=us_macro`）
+  - 返回最新宏观分析结果，读缓存，不触发 LLM
+  - 原文完整输出分析正文，不得压缩
+- **板块/概念 AI 分析**：调用 `mcp_wukong_quant_hermes_sector_latest`（可选参数 `source=dc`（默认）或 `source=ths`）
+  - 返回当日热门板块/概念消内容要和 AI 点评，读缓存，不触发 LLM
+  - 原文完整输出 `analysis` 内容，不得压缩
+- **财报异动信号**：调用 `mcp_wukong_quant_hermes_earnings_signals`（可选参数 `days=7`，默认扫描最近7天）
+  - 返回 `signals` 列表，每条包含：`ts_code`、`signal_type`（业绩预告/快报/卖方研报）、`core_metric`、`date`、`reason`
+  - 按日期倒序输出，如有多条可选择重点展示
 
 ## MCP 配置
 
