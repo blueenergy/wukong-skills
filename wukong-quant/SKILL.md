@@ -32,6 +32,12 @@ prerequisites:
 | 悟空，评分排行 / 悟空，{hs300/a500} 评分 | 查询指定指数评分排行榜 Top N |
 | 悟空，查 {股票代码} 的评分 | 查询单股六维量化评分详情 |
 | 悟空，查 {股票代码} 的历史分析 | 查最近历史分析 |
+| 悟空，登录 / 悟空，我要登录 | 用户登录，获取 JWT token 并提示如何配置 |
+| 悟空，我的账户 / 悟空，我的信息 | 查看当前登录用户账户信息 |
+| 悟空，我的自选股 / 悟空，自选股评分 | 获取自选股列表 + 最新量化评分排行 |
+| 悟空，自选股加 {代码} / 添加到自选 | 将指定股票添加到自选股 |
+| 悟空，自选股删 {代码} / 移除自选 | 从自选股中删除指定股票 |
+| 悟空，自选股历史 / 我的分析记录 | 查询自选股历史深度分析记录 |
 
 ## 深度分析工作流
 
@@ -70,7 +76,42 @@ prerequisites:
    若某字段不存在或为空，跳过该字段；若所有字段均不存在，将 `analysis` 完整 JSON 原样展示
 3. `success=false` 时，输出 `error` 字段；若 `status=timeout`，告知用户可用 `task_id` 继续查询
 
-## 其他工具
+## 登录与个人化功能
+
+### 登录流程
+
+当用户说 **"悟空，登录"** 或 **"悟空，我要登录"**：
+
+1. 询问用户用户名和密码
+2. 调用 `mcp_wukong_quant_user_login`，参数 `username={用户名}` `password={密码}`
+3. 成功后展示 `token` 字段，并输出以下提示：
+
+   > 登录成功！请将以下 token 填入 `.vscode/mcp.json` 的 `wukong-quant` 服务器配置中：
+   > ```
+   > "X-User-Token": "<token>"
+   > ```
+   > 保存后执行 **Ctrl+Shift+P → Developer: Reload Window** 使配置生效。
+   > token 有效期 8 小时，到期后重新登录即可。
+
+4. token 配置生效后，即可使用 `user_profile`、`user_watchlist_stocks`、`user_watchlist_add`、`user_watchlist_history` 等个人化工具
+
+### 个人化工具
+
+- **我的账户**：调用 `mcp_wukong_quant_user_profile`（需 X-User-Token）
+  - 返回：`username`、`email`、`full_name`、`service_level`、`created_at`、`last_login`
+
+- **我的自选股评分**：调用 `mcp_wukong_quant_user_watchlist_stocks`（可选参数 `strategy`）
+  - 返回自选股列表 + 每只股票最新六维量化评分，按综合分降序排列
+  - 若自选股为空，提示用户可使用 `user_watchlist_add` 工具添加
+
+- **添加自选股**：调用 `mcp_wukong_quant_user_watchlist_add`，参数 `symbol={股票代码}`
+
+- **删除自选股**：调用 `mcp_wukong_quant_user_watchlist_remove`，参数 `symbol={股票代码}`
+
+- **自选股历史分析**：调用 `mcp_wukong_quant_user_watchlist_history`（可选参数 `symbol`、`limit`）
+  - 不指定 symbol 则返回所有自选股最近分析记录，指定则筛选单只
+
+> **注意**：以上个人化工具均需在 MCP headers 中设置 `X-User-Token`。若未设置或 token 已过期，工具会返回 401 错误并提示重新登录。
 
 - **查历史**：调用 `mcp_wukong_quant_analysis_history`，参数 `symbol`
 - **连板天梯**：调用 `mcp_wukong_quant_ladder_daily`
@@ -110,4 +151,6 @@ prerequisites:
 | url | `http://localhost:3001/mcp`（或实际部署地址） |
 | 请求头名称 | `X-Hermes-Quant-Key` |
 | 请求头值 | 内部密钥（联系管理员获取） |
+| 请求头名称（个人化） | `X-User-Token` |
+| 请求头值（个人化） | 通过 `user_login` 工具获取的 JWT token（可选，仅个人化端点需要） |
 | ssl_verify | false（自签名证书时可选） |
