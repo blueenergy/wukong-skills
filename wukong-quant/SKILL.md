@@ -35,7 +35,7 @@ prerequisites:
 
 当用户说 **"悟空，深度分析 {symbol}"**：
 
-1. 调用 `mcp_wukong_quant_hermes_deep_analysis_wait`，参数 `symbol={symbol}`（服务端自动等待完成，通常 60-180 秒）
+1. 调用 `mcp_wukong_quant_deep_analysis`，参数 `symbol={symbol}`（服务端自动等待完成，通常 60-180 秒）
 2. `success=true` 时，**原文完整输出**以下字段，不得摘要压缩：
 
    **核心结论**
@@ -70,24 +70,24 @@ prerequisites:
 
 ## 其他工具
 
-- **查历史**：调用 `mcp_wukong_quant_hermes_get_analysis_history`，参数 `symbol`
-- **连板天梯**：调用 `mcp_wukong_quant_hermes_ladder_daily`
-- **涨停分析**：调用 `mcp_wukong_quant_hermes_ladder_narrative`（可选参数 `date=YYYYMMDD`，默认最新）
+- **查历史**：调用 `mcp_wukong_quant_analysis_history`，参数 `symbol`
+- **连板天梯**：调用 `mcp_wukong_quant_ladder_daily`
+- **涨停分析**：调用 `mcp_wukong_quant_ladder_narrative`（可选参数 `date=YYYYMMDD`，默认最新）
   - 返回字段：`headline`（标题）、`sentiment_signal`（情绪信号）、`narrative_markdown`（完整 Markdown 叙事，原文输出）
-- **AI 大盘分析**：调用 `mcp_wukong_quant_hermes_market_summary`（可选参数 `date=YYYY-MM-DD`，默认最新交易日）
+- **AI 大盘分析**：调用 `mcp_wukong_quant_market_summary`（可选参数 `date=YYYY-MM-DD`，默认最新交易日）
   - 交易日 10:00 / 11:30 / 15:30 自动更新；读缓存，不触发 LLM
-- **全球市场简报**：调用 `mcp_wukong_quant_hermes_global_market`（无需参数，自动取最新）
+- **全球市场简报**：调用 `mcp_wukong_quant_global_market`（无需参数，自动取最新）
   - 包含：美股、港股、外汇、大宗商品、宏观联动分析、A 股启示；原文完整输出 `analysis` 字段
-- **热股分析**：调用 `mcp_wukong_quant_hermes_hot_stock`（可选参数 `source=ths`（默认）或 `source=dc`）
+- **热股分析**：调用 `mcp_wukong_quant_hot_stock`（可选参数 `source=ths`（默认）或 `source=dc`）
   - 返回：`analysis`（AI 全文点评）、`rank_time`（榜单时刻）、`stock_count`、`trade_date`
   - 原文完整输出 `analysis` 内容，不得压缩
-- **宏观 AI 分析**：调用 `mcp_wukong_quant_hermes_macro_analysis`（可选参数 `scope=china_macro`（默认）或 `scope=us_macro`）
+- **宏观 AI 分析**：调用 `mcp_wukong_quant_macro_analysis`（可选参数 `scope=china_macro`（默认）或 `scope=us_macro`）
   - 返回最新宏观分析结果，读缓存，不触发 LLM
   - 原文完整输出分析正文，不得压缩
-- **板块/概念 AI 分析**：调用 `mcp_wukong_quant_hermes_sector_latest`（可选参数 `source=dc`（默认）或 `source=ths`）
+- **板块/概念 AI 分析**：调用 `mcp_wukong_quant_sector_latest`（可选参数 `source=dc`（默认）或 `source=ths`）
   - 返回当日热门板块/概念消内容要和 AI 点评，读缓存，不触发 LLM
   - 原文完整输出 `analysis` 内容，不得压缩
-- **财报异动信号**：调用 `mcp_wukong_quant_hermes_earnings_signals`（可选参数 `days=7`，默认扫描最近7天）
+- **财报异动信号**：调用 `mcp_wukong_quant_earnings_signals`（可选参数 `days=7`，默认扫描最近7天）
   - 返回 `signals` 列表，每条包含：`ts_code`、`signal_type`（业绩预告/快报/卖方研报）、`core_metric`、`date`、`reason`
   - 按日期倒序输出，如有多条可选择重点展示
 
