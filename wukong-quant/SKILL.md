@@ -99,14 +99,10 @@ prerequisites:
 - **单股量化评分详情**：调用 `mcp_wukong_quant_stock_score_detail`，参数 `symbol`
   - 返回：`composite_score`（三策略得分）、`cycle/value/fundamental/growth/technical/money_flow_score`（六维子分）
 
-## MCP 配置
+## MCP 服务器要求
 
-需在 `~/.hermes/config.yaml` 中添加：
+本技能依赖 `wukong-quant` MCP 服务器，需通过 Hermes MCP 服务器配置界面完成添加：
 
-```yaml
-mcp_servers:
-  wukong-quant:
-    transport: http
-    url: http://localhost:3001/mcp
-    headers:
-      X-Hermes-Quant-Key: "your-key-here"
+- transport: http
+- url: http://localhost:3001/mcp（或部署地址）
+- 请求头：`X-Hermes-Quant-Key: <内部密钥>`
