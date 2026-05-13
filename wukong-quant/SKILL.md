@@ -101,8 +101,13 @@ prerequisites:
 
 ## MCP 服务器要求
 
-本技能依赖 `wukong-quant` MCP 服务器，需通过 Hermes MCP 服务器配置界面完成添加：
+本技能依赖 `wukong-quant` MCP 服务器，需在 Hermes 中配置以下参数：
 
-- transport: http
-- url: http://localhost:3001/mcp（或部署地址）
-- 请求头：`X-Hermes-Quant-Key: <内部密钥>`
+| 参数 | 值 |
+|------|----|
+| name | wukong-quant |
+| transport | http |
+| url | `http://localhost:3001/mcp`（或实际部署地址） |
+| 请求头名称 | `X-Hermes-Quant-Key` |
+| 请求头值 | 内部密钥（联系管理员获取） |
+| ssl_verify | false（自签名证书时可选） |
