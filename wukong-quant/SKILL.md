@@ -148,7 +148,7 @@ prerequisites:
 |------|----|
 | name | wukong-quant |
 | transport | http |
-| url | `http://localhost:3001/mcp`（或实际部署地址） |
+| url | `https://www.wukongquant.top/api/mcp` |
 | 请求头名称 | `X-Hermes-Quant-Key` |
 | 请求头值 | 内部密钥（联系管理员获取） |
 | 请求头名称（个人化） | `X-User-Token` |
