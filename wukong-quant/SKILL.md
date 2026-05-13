@@ -21,7 +21,8 @@ prerequisites:
 |------|------|
 | 悟空，深度分析 {股票代码} | 提交深度分析任务并等待结果 |
 | 悟空，今日天梯 | 拉取连板天梯数据 |
-| 悟空，今日叙事 / 悟空，今日市场总结 | 获取涨停全景叙事 |
+| 悟空，今日涨停分析 / 悟空，涨停全景 | 获取涨停全景叙事（LLM 生成，盘后 19:00 后可用） |
+| 悟空，今日市场总结 / 悟空，大盘分析 | 获取 AI 大盘分析（情绪/板块/资金/风险，交易日三次自动更新） |
 | 悟空，查 {股票代码} 的历史分析 | 查最近历史分析 |
 
 ## 深度分析工作流
@@ -65,8 +66,10 @@ prerequisites:
 
 - **查历史**：调用 `mcp_wukong_quant_hermes_get_analysis_history`，参数 `symbol`
 - **连板天梯**：调用 `mcp_wukong_quant_hermes_ladder_daily`
-- **涨停叙事**：调用 `mcp_wukong_quant_hermes_ladder_narrative`（可选参数 `date=YYYYMMDD`，默认最新）
+- **涨停分析**：调用 `mcp_wukong_quant_hermes_ladder_narrative`（可选参数 `date=YYYYMMDD`，默认最新）
   - 返回字段：`headline`（标题）、`sentiment_signal`（情绪信号）、`narrative_markdown`（完整 Markdown 叙事，原文输出）
+- **AI 大盘分析**：调用 `mcp_wukong_quant_hermes_market_summary`（可选参数 `date=YYYY-MM-DD`，默认最新交易日）
+  - 交易日 10:00 / 11:30 / 15:30 自动更新；读缓存，不触发 LLM
 
 ## MCP 配置
 
