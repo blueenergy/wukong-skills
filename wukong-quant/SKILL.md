@@ -27,9 +27,17 @@ prerequisites:
 
 当用户说 **"悟空，深度分析 {symbol}"**：
 
-1. 调用 `mcp_wukong_quant_hermes_submit_deep_analysis`，参数 `symbol={symbol}`，获取 `task_id`
-2. 每隔 20 秒调用 `mcp_wukong_quant_hermes_get_task_status`（参数 `task_id`），直到 `status=completed` 或 `failed`（最多轮询 10 次）
-3. `completed` 时输出 `analysis` 字段原文；`failed` 时输出 `error` 字段
+1. 调用 `mcp_wukong_quant_hermes_deep_analysis_wait`，参数 `symbol={symbol}`（服务端自动等待完成，通常 60-180 秒）
+2. `success=true` 时，**原文完整输出**以下字段，不得摘要压缩：
+   - `analysis.investment_advice`（投资建议）
+   - `analysis.technical_analysis`（技术面分析）
+   - `analysis.key_points`（关键结论）
+   - `analysis.short_term_forecast` / `mid_term_forecast` / `long_term_forecast`
+   - `analysis.risk_level`、`analysis.support_level`、`analysis.resistance_level`
+   - `analysis.confidence_score`（信心评分）
+
+   若上述子字段不存在，则将 `analysis` 完整 JSON 原样展示给用户
+3. `success=false` 时，输出 `error` 字段；若 `status=timeout`，告知用户可用 `task_id` 继续查询
 
 ## 其他工具
 
