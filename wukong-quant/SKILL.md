@@ -29,6 +29,8 @@ prerequisites:
 | 悟空，美国宏观 / 悟空，美联储 | 获取美国利率市场深度分析 |
 | 悟空，板块分析 / 悟空，今日概念 | 获取最新板块/概念 AI 分析（盘中热门方向点评） |
 | 悟空，财报信号 / 悟空，业绩异动 | 扫描近期业绩预告/快报/券商评级上调信号 |
+| 悟空，评分排行 / 悟空，{hs300/a500} 评分 | 查询指定指数评分排行榜 Top N |
+| 悟空，查 {股票代码} 的评分 | 查询单股六维量化评分详情 |
 | 悟空，查 {股票代码} 的历史分析 | 查最近历史分析 |
 
 ## 深度分析工作流
@@ -90,6 +92,12 @@ prerequisites:
 - **财报异动信号**：调用 `mcp_wukong_quant_earnings_signals`（可选参数 `days=7`，默认扫描最近7天）
   - 返回 `signals` 列表，每条包含：`ts_code`、`signal_type`（业绩预告/快报/卖方研报）、`core_metric`、`date`、`reason`
   - 按日期倒序输出，如有多条可选择重点展示
+- **股票评分排行榜**：调用 `mcp_wukong_quant_stock_ranking`
+  - 参数：`index_code`（hs300/a500/csi500/csi1000/star50，默认 hs300）、`top`（取前 N 名，默认 20）、`strategy`（balanced/aggressive/conservative）
+  - 返回 `ranking` 列表，每条包含：`rank`、`symbol`、`name`、`industry`、`score`、六维子评分
+  - 原文完整输出前 20 名，包含六维评分
+- **单股量化评分详情**：调用 `mcp_wukong_quant_stock_score_detail`，参数 `symbol`
+  - 返回：`composite_score`（三策略得分）、`cycle/value/fundamental/growth/technical/money_flow_score`（六维子分）
 
 ## MCP 配置
 
