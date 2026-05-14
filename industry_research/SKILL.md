@@ -38,7 +38,7 @@ Automatically perform deep, structured industry research when triggered by user 
 |------|------|----------|
 | `mcp_wukong_quant_stock_ranking` | 行业内龙头股六维评分排行 | 步骤4（竞争格局）、步骤8（标的筛选/结论） |
 | `mcp_wukong_quant_earnings_signals` | 行业内近期业绩预告/快报/评级异动 | 步骤3（景气拐点）、步骤8（标的筛选） |
-| `mcp_wukong_quant_shenwan_index` | 申万行业月度 PE/PB 历史分位（sw_monthly） | 步骤8（估值分位） |
+| `mcp_wukong_quant_shenwan_index` | 申万行业月度 PE/PB 历史分位（sw_monthly）；参数 `ts_code` 为申万指数代码如 `801012.SI` | 步骤8（估值分位） |
 | `mcp_wukong_quant_macro_analysis` | 宏观经济指标（PMI/CPI/PPI/M2） | 步骤1（行业背景） |
 | `web_search` | 市场规模、产能公告、政策文件、公开研报 | 所有步骤补充 |
 | `web_fetch` | 获取具体页面详细内容 | 按需 |
