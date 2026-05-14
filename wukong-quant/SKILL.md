@@ -31,6 +31,7 @@ prerequisites:
 | 悟空，财报信号 / 悟空，业绩异动 | 扫描近期业绩预告/快报/券商评级上调信号 |
 | 悟空，评分排行 / 悟空，{hs300/a500} 评分 | 查询指定指数评分排行榜 Top N |
 | 悟空，查 {股票代码} 的评分 | 查询单股六维量化评分详情 |
+| 悟空，智能选股 / 财务筛选 {条件} | 多条件财务筛选（营业利润/营收同比、绝对值门槛）附申万行业 |
 | 悟空，查 {股票代码} 的历史分析 | 查最近历史分析 |
 | 悟空，登录 / 悟空，我要登录 | 用户登录，获取 JWT token 并提示如何配置 |
 | 悟空，我的账户 / 悟空，我的信息 | 查看当前登录用户账户信息 |
@@ -139,6 +140,53 @@ prerequisites:
   - 原文完整输出前 20 名，包含六维评分
 - **单股量化评分详情**：调用 `mcp_wukong_quant_stock_score_detail`，参数 `symbol`
   - 返回：`composite_score`（三策略得分）、`cycle/value/fundamental/growth/technical/money_flow_score`（六维子分）
+- **智能选股（多条件财务筛选）**：调用 `mcp_wukong_quant_stock_screen`
+  - 参数：`period`（YYYYMMDD 或 `latest`）、`filters`（JSON 字符串）、`report_type`（1累计/2单季，默认1）、`include_sw_industry`、`exclude_st`、`exclude_negative_base`、`sort_by`、`top_n`
+  - 字段白名单：`operate_profit`（营业利润）、`revenue`（主营业务收入，默认）、`total_revenue`（营业总收入）、`n_income`（净利润）、`n_income_attr_p`（归母净利润）、`total_profit`（利润总额）、`oper_cost`（营业成本）
+  - 返回：`matched`（命中总数）、`summary.industries_distribution`（申万 L1 分布）、`results[]`（`ts_code`/`name`/`sw_l1`/`sw_l2`/`sw_l3` + 每个 filter 字段的当期值与 YoY）
+  - 输出时先报行业分布总结，再列出名单，名单超过 20 只可截断并说明
+
+### LLM 参数翻译指南（stock_screen）
+
+自然语言 → `filters` JSON 时必须遵守：
+
+- **百分数 → 小数**：“同比超 35%” → `value: 0.35`，不是 `35`
+- **期次**：2026Q1 → `20260331`；H1/中报 → `20260630`；Q3 → `20260930`；年报 → `20261231`；“最新业绩” → `period="latest"`
+- **累计 vs 单季**：默认 `report_type=1`（行业惯例累计同比）；用户明说“单季”才传 `2`
+- **营收字段**：默认 `revenue`；用户明说“营业总收入”才用 `total_revenue`
+- **比较符**：“超过”/“大于” → `gt`；“不低于”/“至少” → `gte`；“小于” → `lt`；“不高于” → `lte`
+- **主要金额单位**：营收/利润中“一亿”=`100000000`，“五千万”=`50000000`；不要输入带单位的字符串
+
+#### Few-shot 示例
+
+**例 1**：“找 2026 一季报 营业利润同比 超 35%、营收同比 超 30%，同时 2024 一季报 营业利润 大于 1 亿 的股票”
+```
+period=20260331
+report_type=1
+filters=[
+  {"field":"operate_profit","metric_type":"yoy","op":"gt","value":0.35},
+  {"field":"revenue","metric_type":"yoy","op":"gt","value":0.30},
+  {"field":"operate_profit","metric_type":"abs","op":"gt","value":100000000,"base_period":"20240331"}
+]
+```
+
+**例 2**：“最新一期 归母净利润同比 不低于 50% 的 A 股”
+```
+period=latest
+filters=[
+  {"field":"n_income_attr_p","metric_type":"yoy","op":"gte","value":0.50}
+]
+```
+
+**例 3**：“2025 年报 营业总收入 超 100 亿、净利润同比 大于 20% 的股票”
+```
+period=20251231
+report_type=1
+filters=[
+  {"field":"total_revenue","metric_type":"abs","op":"gt","value":10000000000},
+  {"field":"n_income","metric_type":"yoy","op":"gt","value":0.20}
+]
+```
 
 ## MCP 服务器要求
 
