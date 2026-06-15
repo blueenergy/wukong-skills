@@ -32,6 +32,7 @@ prerequisites:
 | 悟空，评分排行 / 悟空，{hs300/a500} 评分 | 查询指定指数评分排行榜 Top N |
 | 悟空，查 {股票代码} 的评分 | 查询单股六维量化评分详情 |
 | 悟空，智能选股 / 财务筛选 {条件} | 多条件财务筛选（营业利润/营收同比、绝对值门槛）附申万行业 |
+| 悟空，2026Q1 外资投行进入前十大流通股东 | 查询指定报告期高盛/摩根士丹利/瑞银/Barclays 等进入前十大流通股东的股票 |
 | 悟空，查 {股票代码} 的历史分析 | 查最近历史分析 |
 | 悟空，登录 / 悟空，我要登录 | 用户登录，获取 JWT token 并提示如何配置 |
 | 悟空，我的账户 / 悟空，我的信息 | 查看当前登录用户账户信息 |
@@ -141,6 +142,11 @@ prerequisites:
   - 原文完整输出前 20 名，包含六维评分
 - **单股量化评分详情**：调用 `mcp_wukong_quant_read_stock_score_detail`，参数 `symbol`
   - 返回：`composite_score`（三策略得分）、`cycle/value/fundamental/growth/technical/money_flow_score`（六维子分）
+- **外资投行前十大流通股东筛选**：调用 `mcp_wukong_quant_read_foreign_top10_floatholders`
+  - 参数：`period`（报告期 YYYYMMDD；2026Q1 → `20260331`）、`holders`（可选，逗号分隔；默认高盛/摩根士丹利/瑞银/Barclays）、`new_only`（可选，是否仅看较上一期新进）、`previous_period`（可选）
+  - 用户说“进入前十大流通股东”时默认 `new_only=false`；用户明确说“新进”时传 `new_only=true`
+  - 返回 `results`，每条包含：`ts_code`、`name`、`industry`、`holder_name`、`norm_label`、`holder_rank`、`hold_amount`、`hold_ratio`、`ann_date`、`end_date`
+  - 输出时先按 `by_holder` 总结各机构命中数量，再列出股票；结果很多时展示前 30 条并说明 `matched_count`
 - **智能选股（多条件财务筛选）**：调用 `mcp_wukong_quant_read_stock_screen`
   - 参数：`period`（YYYYMMDD 或 `latest`）、`filters`（JSON 字符串）、`report_type`（1累计/2单季，默认1）、`include_sw_industry`、`exclude_st`、`exclude_negative_base`、`sort_by`、`top_n`
   - 字段白名单：`operate_profit`（营业利润）、`revenue`（主营业务收入，默认）、`total_revenue`（营业总收入）、`n_income`（净利润）、`n_income_attr_p`（归母净利润）、`total_profit`（利润总额）、`oper_cost`（营业成本）
