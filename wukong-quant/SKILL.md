@@ -1,6 +1,6 @@
 ---
 name: wukong-quant
-description: 通过悟空量化 MCP 接口调用 A 股深度分析、连板天梯等功能。需配置 wukong-quant MCP 服务器。
+description: 通过悟空量化 MCP 接口调用 A 股深度分析、连板天梯等功能。需配置 wukong-quant-read 和 wukong-quant-actions MCP 服务器。
 version: 1.0.0
 author: blueenergy
 license: MIT
@@ -8,7 +8,7 @@ metadata:
   hermes:
     tags: [quant, stock, A-share, MCP, wukong]
 prerequisites:
-  mcp_servers: [wukong-quant]
+  mcp_servers: [wukong-quant-read, wukong-quant-actions]
 ---
 
 # 悟空量化
@@ -44,7 +44,7 @@ prerequisites:
 
 当用户说 **"悟空，深度分析 {symbol}"**：
 
-1. 调用 `mcp_wukong_quant_deep_analysis`，参数 `symbol={symbol}`（服务端自动等待完成，通常 60-180 秒）
+1. 调用 `mcp_wukong_quant_actions_deep_analysis`，参数 `symbol={symbol}`（服务端自动等待完成，通常 60-180 秒）
 2. `success=true` 时，**原文完整输出**以下字段，不得摘要压缩：
 
    **核心结论**
@@ -84,10 +84,11 @@ prerequisites:
 当用户说 **"悟空，登录"** 或 **"悟空，我要登录"**：
 
 1. 询问用户用户名和密码
-2. 调用 `mcp_wukong_quant_user_login`，参数 `username={用户名}` `password={密码}`
+2. 调用 `mcp_wukong_quant_actions_user_login`，参数 `username={用户名}` `password={密码}`
 3. 成功后展示 `token` 字段，并输出以下提示：
 
-   > 登录成功！请将以下 token 填入 `.vscode/mcp.json` 的 `wukong-quant` 服务器配置中：
+   > 登录成功！请将以下 token 填入 `.vscode/mcp.json` 的 `wukong-quant-read`
+   > 和 `wukong-quant-actions` 服务器 headers 中：
    > ```
    > "X-User-Token": "<token>"
    > ```
@@ -98,49 +99,49 @@ prerequisites:
 
 ### 个人化工具
 
-- **我的账户**：调用 `mcp_wukong_quant_user_profile`（需 X-User-Token）
+- **我的账户**：调用 `mcp_wukong_quant_read_user_profile`（需 X-User-Token）
   - 返回：`username`、`email`、`full_name`、`service_level`、`created_at`、`last_login`
 
-- **我的自选股评分**：调用 `mcp_wukong_quant_user_watchlist_stocks`（可选参数 `strategy`）
+- **我的自选股评分**：调用 `mcp_wukong_quant_read_user_watchlist_stocks`（可选参数 `strategy`）
   - 返回自选股列表 + 每只股票最新六维量化评分，按综合分降序排列
   - 若自选股为空，提示用户可使用 `user_watchlist_add` 工具添加
 
-- **添加自选股**：调用 `mcp_wukong_quant_user_watchlist_add`，参数 `symbol={股票代码}`
+- **添加自选股**：调用 `mcp_wukong_quant_actions_user_watchlist_add`，参数 `symbol={股票代码}`
 
-- **删除自选股**：调用 `mcp_wukong_quant_user_watchlist_remove`，参数 `symbol={股票代码}`
+- **删除自选股**：调用 `mcp_wukong_quant_actions_user_watchlist_remove`，参数 `symbol={股票代码}`
 
-- **自选股历史分析**：调用 `mcp_wukong_quant_user_watchlist_history`（可选参数 `symbol`、`limit`）
+- **自选股历史分析**：调用 `mcp_wukong_quant_read_user_watchlist_history`（可选参数 `symbol`、`limit`）
   - 不指定 symbol 则返回所有自选股最近分析记录，指定则筛选单只
 
 > **注意**：以上个人化工具均需在 MCP headers 中设置 `X-User-Token`。若未设置或 token 已过期，工具会返回 401 错误并提示重新登录。
 
-- **查历史**：调用 `mcp_wukong_quant_analysis_history`，参数 `symbol`
-- **连板天梯**：调用 `mcp_wukong_quant_ladder_daily`
-- **涨停分析**：调用 `mcp_wukong_quant_ladder_narrative`（可选参数 `date=YYYYMMDD`，默认最新）
+- **查历史**：调用 `mcp_wukong_quant_read_analysis_history`，参数 `symbol`
+- **连板天梯**：调用 `mcp_wukong_quant_read_ladder_daily`
+- **涨停分析**：调用 `mcp_wukong_quant_read_ladder_narrative`（可选参数 `date=YYYYMMDD`，默认最新）
   - 返回字段：`headline`（标题）、`sentiment_signal`（情绪信号）、`narrative_markdown`（完整 Markdown 叙事，原文输出）
-- **AI 大盘分析**：调用 `mcp_wukong_quant_market_summary`（可选参数 `date=YYYY-MM-DD`，默认最新交易日）
+- **AI 大盘分析**：调用 `mcp_wukong_quant_read_market_summary`（可选参数 `date=YYYY-MM-DD`，默认最新交易日）
   - 交易日 10:00 / 11:30 / 15:30 自动更新；读缓存，不触发 LLM
-- **全球市场简报**：调用 `mcp_wukong_quant_global_market`（无需参数，自动取最新）
+- **全球市场简报**：调用 `mcp_wukong_quant_read_global_market`（无需参数，自动取最新）
   - 包含：美股、港股、外汇、大宗商品、宏观联动分析、A 股启示；原文完整输出 `analysis` 字段
-- **热股分析**：调用 `mcp_wukong_quant_hot_stock`（可选参数 `source=ths`（默认）或 `source=dc`）
+- **热股分析**：调用 `mcp_wukong_quant_read_hot_stock`（可选参数 `source=ths`（默认）或 `source=dc`）
   - 返回：`analysis`（AI 全文点评）、`rank_time`（榜单时刻）、`stock_count`、`trade_date`
   - 原文完整输出 `analysis` 内容，不得压缩
-- **宏观 AI 分析**：调用 `mcp_wukong_quant_macro_analysis`（可选参数 `scope=china_macro`（默认）或 `scope=us_macro`）
+- **宏观 AI 分析**：调用 `mcp_wukong_quant_read_macro_analysis`（可选参数 `scope=china_macro`（默认）或 `scope=us_macro`）
   - 返回最新宏观分析结果，读缓存，不触发 LLM
   - 原文完整输出分析正文，不得压缩
-- **板块/概念 AI 分析**：调用 `mcp_wukong_quant_sector_latest`（可选参数 `source=dc`（默认）或 `source=ths`）
+- **板块/概念 AI 分析**：调用 `mcp_wukong_quant_read_sector_latest`（可选参数 `source=dc`（默认）或 `source=ths`）
   - 返回当日热门板块/概念消内容要和 AI 点评，读缓存，不触发 LLM
   - 原文完整输出 `analysis` 内容，不得压缩
-- **财报异动信号**：调用 `mcp_wukong_quant_earnings_signals`（可选参数 `days=7`，默认扫描最近7天）
+- **财报异动信号**：调用 `mcp_wukong_quant_read_earnings_signals`（可选参数 `days=7`，默认扫描最近7天）
   - 返回 `signals` 列表，每条包含：`ts_code`、`signal_type`（业绩预告/快报/卖方研报）、`core_metric`、`date`、`reason`
   - 按日期倒序输出，如有多条可选择重点展示
-- **股票评分排行榜**：调用 `mcp_wukong_quant_stock_ranking`
+- **股票评分排行榜**：调用 `mcp_wukong_quant_read_stock_ranking`
   - 参数：`index_code`（hs300/a500/csi500/csi1000/star50，默认 hs300）、`top`（取前 N 名，默认 20）、`strategy`（balanced/aggressive/conservative）
   - 返回 `ranking` 列表，每条包含：`rank`、`symbol`、`name`、`industry`、`score`、六维子评分
   - 原文完整输出前 20 名，包含六维评分
-- **单股量化评分详情**：调用 `mcp_wukong_quant_stock_score_detail`，参数 `symbol`
+- **单股量化评分详情**：调用 `mcp_wukong_quant_read_stock_score_detail`，参数 `symbol`
   - 返回：`composite_score`（三策略得分）、`cycle/value/fundamental/growth/technical/money_flow_score`（六维子分）
-- **智能选股（多条件财务筛选）**：调用 `mcp_wukong_quant_stock_screen`
+- **智能选股（多条件财务筛选）**：调用 `mcp_wukong_quant_read_stock_screen`
   - 参数：`period`（YYYYMMDD 或 `latest`）、`filters`（JSON 字符串）、`report_type`（1累计/2单季，默认1）、`include_sw_industry`、`exclude_st`、`exclude_negative_base`、`sort_by`、`top_n`
   - 字段白名单：`operate_profit`（营业利润）、`revenue`（主营业务收入，默认）、`total_revenue`（营业总收入）、`n_income`（净利润）、`n_income_attr_p`（归母净利润）、`total_profit`（利润总额）、`oper_cost`（营业成本）
   - 返回：`matched`（命中总数）、`summary.industries_distribution`（申万 L1 分布）、`results[]`（`ts_code`/`name`/`sw_l1`/`sw_l2`/`sw_l3` + 每个 filter 字段的当期值与 YoY）
@@ -190,15 +191,39 @@ filters=[
 
 ## MCP 服务器要求
 
-本技能依赖 `wukong-quant` MCP 服务器，需在 Hermes 中配置以下参数：
+本技能依赖两个 MCP 服务器：
 
-| 参数 | 值 |
-|------|----|
-| name | wukong-quant |
-| transport | http |
-| url | `https://www.wukongquant.top/api/mcp` |
-| 请求头名称 | `X-Hermes-Quant-Key` |
-| 请求头值 | 内部密钥（联系管理员获取） |
-| 请求头名称（个人化） | `X-User-Token` |
-| 请求头值（个人化） | 通过 `user_login` 工具获取的 JWT token（可选，仅个人化端点需要） |
-| ssl_verify | false（自签名证书时可选） |
+- `wukong-quant-read`：只读工具，查询行情、天梯、市场分析、评分、自选股信息等。
+- `wukong-quant-actions`：动作工具，提交深度分析、登录、添加/删除自选股等有副作用操作。
+
+拆分 read/actions 后，工具名前缀也随 server name 区分：
+
+- 只读工具：`mcp_wukong_quant_read_*`
+- 动作工具：`mcp_wukong_quant_actions_*`
+
+### 公网服务
+
+| MCP server | transport | url |
+|------------|-----------|-----|
+| wukong-quant-read | http | `https://www.wukongquant.top/api/mcp/read` |
+| wukong-quant-actions | http | `https://www.wukongquant.top/api/mcp/actions` |
+
+### 本地部署
+
+本地 Hermes 与 quantFinance 同在 `quant-network` 时，直接连接两个 MCP 容器：
+
+| MCP server | transport | url |
+|------------|-----------|-----|
+| wukong-quant-read | http | `http://quant-mcp:3002/api/mcp` |
+| wukong-quant-actions | http | `http://quant-mcp-actions:3003/api/mcp` |
+
+### 请求头
+
+两个 MCP server 都需要配置：
+
+| 请求头名称 | 值 |
+|------------|----|
+| `X-Hermes-Quant-Key` | 公网服务使用内部密钥；本地部署使用 `quantFinance/.env` 中的 `HERMES_QUANT_INTERNAL_KEY` |
+| `X-User-Token` | 通过 `user_login` 工具获取的 JWT token（可选，仅个人化端点需要） |
+
+自签名证书场景可按 Hermes MCP 配置支持情况设置 `ssl_verify=false`。
