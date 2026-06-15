@@ -148,7 +148,11 @@ prerequisites:
   - 涨幅过滤参数：`return_start`（区间起始交易日，如 2026 年涨幅 → `20260101`）、`return_end`（可选，默认最新可用交易日）、`max_return_pct`（最大区间涨幅百分比，如“不超过 30%” → `30`）
   - 用户说“进入前十大流通股东”时默认 `new_only=false`；用户明确说“新进”时传 `new_only=true`
   - 用户说“2026 年涨幅没超过 30% / 未超过 30%”时传 `return_start="20260101"`、`max_return_pct=30`
-  - 返回 `results`，每条包含：`ts_code`、`name`、`industry`、`holder_name`、`norm_label`、`holder_rank`、`hold_amount`、`hold_ratio`、`ann_date`、`end_date`；若使用涨幅过滤，还包含 `range_return.return_pct`
+  - 返回 `results`，每条包含：`ts_code`、`name`、`industry`、`holder_name`、`norm_label`、`holder_rank`、`hold_amount`、`hold_ratio`、`hold_ratio_pct`、`hold_ratio_display`、`ann_date`、`end_date`；若使用涨幅过滤，还包含顶层 `return_pct`、`return_pct_display`、`max_return_pct`、`return_start_trade_date`、`return_end_trade_date`，以及详细结构 `range_return`
+  - 返回 `changes` 与 `change_summary`，对比 `period` 和 `previous_period`（未传则自动取上一报告期），`change_type` 包含 `increased`（增持）、`decreased`（减持）、`unchanged`（不变）、`new`（新进）、`exited`（退出）
+  - 展示变化时同时列出 `current` 和 `previous`，优先使用 `hold_ratio_chg_display` 表示持股比例百分点变化；例如“高盛较 2025 年报增持 0.20pct”，“摩根士丹利退出前十大流通股东”
+  - `hold_ratio` / `hold_ratio_pct` 已经是百分点数值（例如 `0.199` 表示 `0.199%`），不是 0-1 小数；展示时优先使用 `hold_ratio_display`，不要再乘以 100
+  - 展示 2026 年涨幅时优先使用 `return_pct_display`；若使用 `return_pct`，它也已经是百分点数值，不要再乘以 100
   - 输出时先按 `by_holder` 总结各机构命中数量，再列出股票；结果很多时展示前 30 条并说明 `matched_count`
 - **智能选股（多条件财务筛选）**：调用 `mcp_wukong_quant_read_stock_screen`
   - 参数：`period`（YYYYMMDD 或 `latest`）、`filters`（JSON 字符串）、`report_type`（1累计/2单季，默认1）、`include_sw_industry`、`exclude_st`、`exclude_negative_base`、`sort_by`、`top_n`
@@ -217,9 +221,23 @@ filters=[
 | wukong-quant-read | http | `https://www.wukongquant.top/api/mcp/read` |
 | wukong-quant-actions | http | `https://www.wukongquant.top/api/mcp/actions` |
 
-### 本地部署
+### 本地部署：host Hermes CLI
 
-本地 Hermes 与 quantFinance 同在 `quant-network` 时，直接连接两个 MCP 容器：
+当 Hermes 直接运行在宿主机上（例如终端执行 `hermes`）时，`localhost` 指向宿主机。
+如果 quantFinance compose 已将 MCP 服务端口映射到宿主机，使用：
+
+| MCP server | transport | url |
+|------------|-----------|-----|
+| wukong-quant-read | http | `http://localhost:3002/api/mcp` |
+| wukong-quant-actions | http | `http://localhost:3003/api/mcp` |
+
+不要在 host Hermes CLI 配置里使用 `quant-mcp` / `quant-mcp-actions`，这些是 Docker
+网络内服务名，宿主机上通常无法解析。
+
+### 本地部署：Docker 内 Hermes
+
+当 Hermes 自己也运行在 Docker 容器中，并且与 quantFinance 同在 `quant-network` 时，
+直接连接两个 MCP 容器：
 
 | MCP server | transport | url |
 |------------|-----------|-----|
