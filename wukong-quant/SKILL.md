@@ -33,6 +33,7 @@ prerequisites:
 | 悟空，查 {股票代码} 的评分 | 查询单股六维量化评分详情 |
 | 悟空，智能选股 / 财务筛选 {条件} | 多条件财务筛选（营业利润/营收同比、绝对值门槛）附申万行业 |
 | 悟空，2026Q1 外资投行进入前十大流通股东 | 查询指定报告期高盛/摩根士丹利/瑞银/Barclays 等进入前十大流通股东的股票 |
+| 悟空，外资投行进入前十大流通股东但 2026 年涨幅没超过 30% | 在外资投行股东筛选基础上叠加区间涨幅过滤 |
 | 悟空，查 {股票代码} 的历史分析 | 查最近历史分析 |
 | 悟空，登录 / 悟空，我要登录 | 用户登录，获取 JWT token 并提示如何配置 |
 | 悟空，我的账户 / 悟空，我的信息 | 查看当前登录用户账户信息 |
@@ -144,8 +145,10 @@ prerequisites:
   - 返回：`composite_score`（三策略得分）、`cycle/value/fundamental/growth/technical/money_flow_score`（六维子分）
 - **外资投行前十大流通股东筛选**：调用 `mcp_wukong_quant_read_foreign_top10_floatholders`
   - 参数：`period`（报告期 YYYYMMDD；2026Q1 → `20260331`）、`holders`（可选，逗号分隔；默认高盛/摩根士丹利/瑞银/Barclays）、`new_only`（可选，是否仅看较上一期新进）、`previous_period`（可选）
+  - 涨幅过滤参数：`return_start`（区间起始交易日，如 2026 年涨幅 → `20260101`）、`return_end`（可选，默认最新可用交易日）、`max_return_pct`（最大区间涨幅百分比，如“不超过 30%” → `30`）
   - 用户说“进入前十大流通股东”时默认 `new_only=false`；用户明确说“新进”时传 `new_only=true`
-  - 返回 `results`，每条包含：`ts_code`、`name`、`industry`、`holder_name`、`norm_label`、`holder_rank`、`hold_amount`、`hold_ratio`、`ann_date`、`end_date`
+  - 用户说“2026 年涨幅没超过 30% / 未超过 30%”时传 `return_start="20260101"`、`max_return_pct=30`
+  - 返回 `results`，每条包含：`ts_code`、`name`、`industry`、`holder_name`、`norm_label`、`holder_rank`、`hold_amount`、`hold_ratio`、`ann_date`、`end_date`；若使用涨幅过滤，还包含 `range_return.return_pct`
   - 输出时先按 `by_holder` 总结各机构命中数量，再列出股票；结果很多时展示前 30 条并说明 `matched_count`
 - **智能选股（多条件财务筛选）**：调用 `mcp_wukong_quant_read_stock_screen`
   - 参数：`period`（YYYYMMDD 或 `latest`）、`filters`（JSON 字符串）、`report_type`（1累计/2单季，默认1）、`include_sw_industry`、`exclude_st`、`exclude_negative_base`、`sort_by`、`top_n`
