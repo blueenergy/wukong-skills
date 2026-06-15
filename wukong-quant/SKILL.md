@@ -15,6 +15,12 @@ prerequisites:
 
 通过 wukong-quant MCP 工具访问 A 股量化数据。
 
+## 工具调用约束
+
+- 不要用 `execute_code` / `terminal` / `curl` 直连 quant API，也不要猜测 REST endpoint（例如 `/api/v1/...`）。
+- 所有量化查询必须优先并仅通过对应的 wukong-quant MCP 工具调用。
+- 如果 MCP 工具失败，报告失败的 MCP 工具名、参数和错误信息；不要 fallback 到未声明的 REST 路径。
+
 ## 触发词
 
 | 说法 | 动作 |
