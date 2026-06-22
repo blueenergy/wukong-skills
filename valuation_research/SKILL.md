@@ -1,7 +1,7 @@
 ---
 name: valuation_research
 description: A股科技企业单股估值研究，生成面向研究员/内部PM的估值输入包。Use when the user asks 估值研究、估值框架、某股票怎么估值、科技股估值、PS/研发强度/FCF/Rule of 40, especially for A-share technology companies.
-version: 0.1.0
+version: 0.2.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -41,31 +41,50 @@ prerequisites:
 
 优先直接调用 MCP 工具，不猜 REST endpoint，不用 terminal/curl 直连 quant-api。
 
+**首选工具固定为 `mcp_wukong_quant_read_stock_valuation_metrics`**：估值指标、近 N 期序列、历史分位、缺失说明都来自它，先调用它再考虑其它。
+
 | 工具 | 用途 |
 |------|------|
-| `mcp_wukong_quant_read_stock_valuation_metrics` | 单股 PS、PE/PB、研发强度、毛利率、FCFF margin、收入增速、Rule of 40 |
+| `mcp_wukong_quant_read_stock_valuation_metrics` | 首选。单股 PS、PE/PB、研发强度、毛利率、FCFF margin、收入增速、Rule of 40；含 `series`(近 N 期)、`valuation_percentiles`(PE/PB/PS 自身历史分位)、`missing` 与 `missing_notes` |
 | `mcp_wukong_quant_read_stock_score_detail` | 单股六维评分，辅助判断成长/价值/基本面是否一致 |
 | `mcp_wukong_quant_read_analysis_history` | 历史深度分析，补充已有结论和风险 |
 | `mcp_wukong_quant_read_shenwan_index` | 申万行业 PE/PB 分位，提供行业估值背景 |
 | `mcp_wukong_quant_read_earnings_signals` | 业绩预告/快报/卖方评级异动 |
 | `mcp_wukong_quant_actions_deep_analysis` | 必要时触发深度分析；不要默认触发 |
 
-工具失败时，报告工具名、参数和错误。缺字段写 `[数据不可用]`，不要让 LLM 补数字。
+工具失败时，报告工具名、参数和错误。缺字段优先引用 `missing_notes` 的可读说明，并写 `[数据不可用]`，不要让 LLM 补数字。
+
+## Metric interpretation rules
+
+读 `stock_valuation_metrics` 时按以下规则解释，不要把单一指标直接等同于高估/低估：
+
+- PS / PS 分位：PS 高低必须配合收入增速与毛利率一起看。高 PS 只有在高增速 + 高毛利时才合理；用 `valuation_percentiles.ps_ttm` 说明“贵/便宜”是相对自身历史，而非绝对结论。
+- 收入增速（`revenue_growth_pct` 与 `series`）：看趋势与稳定性，不只看最新一期。增速是否在 `series` 里持续下滑要明确指出。
+- 研发强度（`rd_intensity_pct`）：高研发强度说明当期利润被研发压制，应提示“用 PS / 调整后利润”而不是直接用 PE。
+- 毛利率 / 净利率：毛利率反映商业模式，净利率受研发/费用影响；二者背离要点出。
+- FCFF margin 与 `fcff_positive_periods/fcff_sample_periods`：正值期数占比低 = 现金流不稳定，DCF 降权的核心依据。
+- Rule of 40：仅作质量粗筛（增速%+利润率%≥40 为佳），不是估值目标，必须注明口径(净利/FCFF)。
+
+## DCF de-weighting rules
+
+用 `series` 与 `derived` 量化判断，给出明确措辞：
+
+- DCF 降权（不作为主框架）：`fcff_positive_periods / fcff_sample_periods < 0.5`，或最新净利率≤0，或收入增速≥20% 且利润未稳定。话术示例：“现金流样本中仅 X/Y 期 FCFF 为正，DCF 不宜作为主估值，仅供方向性参考”。
+- DCF 可作交叉验证：FCFF 多期为正且 `series` 中增速与利润率趋稳。
+- 任何情况下都不要用银行/保险/证券口径套 FCFF DCF；若标的是金融，直接说明应转 PB-ROE / DDM。
 
 ## Analysis workflow
 
 1. 识别股票与科技子类。若行业明显不是科技，说明本 skill 适用性有限，并转为通用估值框架建议。
-2. 调用 `mcp_wukong_quant_read_stock_valuation_metrics` 获取结构化估值指标。
+2. 调用 `mcp_wukong_quant_read_stock_valuation_metrics` 获取结构化估值指标、`series` 与 `valuation_percentiles`。
 3. 调用 `mcp_wukong_quant_read_stock_score_detail` 和历史分析补充语境。
-4. 判断 DCF 是否应降权：
-   - FCFF 为负或波动大、研发投入高、收入高增长但利润未稳定时，DCF 降权。
-   - FCFF 稳定为正、收入增速趋稳、利润率可解释时，DCF 可作为交叉验证。
+4. 用上面的「DCF de-weighting rules」判断 DCF 权重，并引用具体期数/数值。
 5. 选择科技估值框架：
    - 收入高增长且利润未稳定：PS / EV-Sales / 增速-倍数匹配。
    - 已盈利且增长较快：PEG / PE 与增速交叉验证。
    - 多业务线差异大：SOTP，但必须标注分部收入缺口。
    - 成熟现金流：DCF + 相对估值。
-6. 输出缺失信息清单和研究员待确认假设。
+6. 输出缺失信息清单（引用 `missing_notes`）和研究员待确认假设。
 
 ## Source annotation
 
@@ -74,6 +93,8 @@ prerequisites:
 | 来源 | 标注格式 |
 |------|----------|
 | 估值指标工具 | `[stock_valuation_metrics: 字段名]` |
+| 历史分位 | `[stock_valuation_metrics: valuation_percentiles.字段名]` |
+| 多期序列 | `[stock_valuation_metrics: series[i].字段名]` |
 | 评分工具 | `[stock_score_detail: 字段名]` |
 | 历史分析 | `[analysis_history: 字段名]` |
 | 行业估值分位 | `[shenwan_index: 字段名]` |
@@ -96,15 +117,15 @@ prerequisites:
 - DCF 权重判断：
 
 ## 2. 结构化估值指标
-- PS TTM：
-- 收入增速：
+- PS TTM（含自身历史分位）：
+- 收入增速（最新 + 近 N 期趋势）：
 - 研发强度：
 - 毛利率 / 净利率：
-- FCFF margin：
+- FCFF margin（及正值期数/样本期数）：
 - Rule of 40：
 
 ## 3. 模型适用性
-- DCF：
+- DCF（含降权依据：FCFF 正值期数 / 样本期数）：
 - PS / EV-Sales：
 - PEG / PE：
 - SOTP：
