@@ -37,6 +37,7 @@ prerequisites:
 | 悟空，财报信号 / 悟空，业绩异动 | 扫描近期业绩预告/快报/券商评级上调信号 |
 | 悟空，评分排行 / 悟空，{hs300/a500} 评分 | 查询指定指数评分排行榜 Top N |
 | 悟空，查 {股票代码} 的评分 | 查询单股六维量化评分详情 |
+| 悟空，查 {股票代码} 的科技估值指标 | 查询单股 PS、研发强度、FCFF margin、收入增速等科技估值结构化指标 |
 | 悟空，智能选股 / 财务筛选 {条件} | 多条件财务筛选（营业利润/营收同比、绝对值门槛）附申万行业 |
 | 悟空，2026Q1 外资投行进入前十大流通股东 | 查询指定报告期高盛/摩根士丹利/瑞银/Barclays 等进入前十大流通股东的股票 |
 | 悟空，外资投行进入前十大流通股东但 2026 年涨幅没超过 30% | 在外资投行股东筛选基础上叠加区间涨幅过滤 |
@@ -149,6 +150,9 @@ prerequisites:
   - 原文完整输出前 20 名，包含六维评分
 - **单股量化评分详情**：调用 `mcp_wukong_quant_read_stock_score_detail`，参数 `symbol`
   - 返回：`composite_score`（三策略得分）、`cycle/value/fundamental/growth/technical/money_flow_score`（六维子分）
+- **单股科技估值结构化指标**：调用 `mcp_wukong_quant_read_stock_valuation_metrics`，参数 `symbol`
+  - 返回：`market.ps_ttm/pe_ttm/pb/total_mv_wan`、`financial.revenue_growth_pct/rd_exp_yuan/gross_margin_pct/net_margin_pct/fcff_yuan`、`derived.rd_intensity_pct/fcff_margin_pct/rule_of_40_net_margin/rule_of_40_fcff_margin`
+  - 缺失字段统一在 `missing` 中列出；输出时不要让 LLM 补数字
 - **外资投行前十大流通股东筛选**：调用 `mcp_wukong_quant_read_foreign_top10_floatholders`
   - 参数：`period`（报告期 YYYYMMDD；2026Q1 → `20260331`）、`holders`（可选，逗号分隔；默认高盛/摩根士丹利/瑞银/Barclays）、`new_only`（可选，是否仅看较上一期新进）、`previous_period`（可选）
   - 涨幅过滤参数：`return_start`（区间起始交易日，如 2026 年涨幅 → `20260101`）、`return_end`（可选，默认最新可用交易日）、`max_return_pct`（最大区间涨幅百分比，如“不超过 30%” → `30`）
