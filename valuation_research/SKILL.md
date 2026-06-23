@@ -1,7 +1,7 @@
 ---
 name: valuation_research
 description: A股科技企业单股估值研究，生成面向研究员/内部PM的估值输入包。Use when the user asks 估值研究、估值框架、某股票怎么估值、科技股估值、PS/研发强度/FCF/Rule of 40, especially for A-share technology companies.
-version: 0.5.0
+version: 0.6.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -45,7 +45,7 @@ prerequisites:
 
 | 工具 | 用途 |
 |------|------|
-| `mcp_wukong_quant_read_stock_valuation_metrics` | 首选。单股 PS、PE/PB、研发强度、毛利率、FCFF margin、收入增速、Rule of 40；含 `series`(近 N 期)、`quality`(利润/现金流/资产效率)、`derived`(含 `normalized_pe_ttm`/`profit_quality_alert`/`fcff_seasonality_note`/`peg_hist`/`forward_pe`/`forward_peg`/`forward_growth`)、`segments`/`segments_series`(分部占比与同比)、`valuation_percentiles`、`missing` 与 `missing_notes` |
+| `mcp_wukong_quant_read_stock_valuation_metrics` | 首选。单股 PS、PE/PB、研发强度、毛利率、FCFF margin、收入增速、Rule of 40；含 `series`(近 N 期)、`quality`(利润/现金流/资产效率)、`derived`(含 `normalized_pe_ttm`/`profit_quality_alert`/`fcff_seasonality_note`/`peg_hist`/`forward_pe`/`forward_peg`/`forward_growth`)、`segments`/`segments_series`(分部占比与同比)、`valuation_percentiles`、`missing`/`missing_notes` 与 `data_quality`(缺失原因、影响指标、补数命令) |
 | `mcp_wukong_quant_read_stock_earnings_consensus` | 单股卖方一致预期。按预测财年(`quarter` 如 2025Q4)聚合净利/营收/EPS 中位数、评级分布、覆盖机构；用于替代「全年一致预期待确认」 |
 | `mcp_wukong_quant_read_stock_industry_comparison` | 单股同业横向比较。按 `sw_l2` 优先、缺失自动降级，返回 PE/PB/PS/**PEG**、市值、ROE、利润率、收入增速的同业中位数与分位；`named_peers` 给出点名同业并排(默认市值 Top N，传 `peer_symbols=603039.SH,600588.SH` 用指定名单，可跨行业)的 `pe_ttm/ps_ttm/peg/净利率/增速`；分位含自身，估值倍数/PEG 仅统计正值、财务指标含负值，`peer_percentile`/`peer_median` 为 null 时看 `sample_count` 与 `notes` |
 | `mcp_wukong_quant_read_stock_score_detail` | 单股六维评分，辅助判断成长/价值/基本面是否一致 |
@@ -54,9 +54,9 @@ prerequisites:
 | `mcp_wukong_quant_read_earnings_signals` | 业绩预告/快报/卖方评级异动 |
 | `mcp_wukong_quant_actions_deep_analysis` | 必要时触发深度分析；不要默认触发 |
 
-工具失败时，报告工具名、参数和错误。缺字段优先引用 `missing_notes` 的可读说明，并写 `[数据不可用]`，不要让 LLM 补数字。
+工具失败时，报告工具名、参数和错误。缺字段优先引用 `data_quality.items[]` 与 `missing_notes` 的可读说明，并写 `[数据不可用]`，不要让 LLM 补数字。
 
-**硬规则：有工具数据时禁止标 `[待研究员确认]`**。必须先查 `quality` / `series` / `derived` / `industry_comparison` / `earnings_consensus`；只有工具确实无数据或需要价值判断时才用下方三级标注。
+**硬规则：有工具数据时禁止标 `[待研究员确认]`**。必须先查 `quality` / `series` / `derived` / `industry_comparison` / `earnings_consensus` / `data_quality`；只有工具确实无数据或需要价值判断时才用下方三级标注。
 
 ## Metric interpretation rules
 
@@ -88,6 +88,7 @@ prerequisites:
 - 卖方一致预期（`earnings_consensus`）：`forecasts_by_quarter` 给出各预测财年净利/营收/EPS 中位数；有数据则引用，无数据标 `[数据不可用]`。
 - PEG（`derived.peg_hist` / `derived.forward_peg`）：自身 PEG **必须**用工具值，不得手算。`peg_hist=pe_ttm/净利同比`（历史口径）；`forward_peg=forward_pe/一致净利增速`（前瞻口径，依赖 `earnings_consensus`，更贴卖方）。两者都为 null 时（净利增速≤0 等）才说明 PEG 不适用，并改用 PS/增速匹配。
 - 点名同业 PS/PEG（`stock_industry_comparison.named_peers`）：当用户/报告要求「对比某某同业的 PS 和 PEG」时，**禁止**标待确认，必须传 `peer_symbols` 调用本工具，引用 `named_peers[].ps_ttm` 与 `named_peers[].peg` 做并排；`named_peers` 的 `peg` 为历史口径，前瞻 PEG 仅目标股有，对比时要注明口径。同业个体增速≤0 时其 `peg` 为 null，照实说明而非补数。
+- 数据质量（`data_quality`）：生成缺失清单前必须先读 `data_quality.items[]`。只有 `must_fix=true` 的项可进入 `[数据不可用]`，并必须带 `status/problem/repair_command`；`not_triggered` 表示未触发提示（如无利润质量告警），`not_applicable` 表示口径不适用（如增速≤0 导致 PEG 无意义），二者**不得**写入缺失清单。
 
 ## DCF de-weighting rules
 
@@ -100,7 +101,7 @@ prerequisites:
 ## Analysis workflow
 
 1. 识别股票与科技子类。若行业明显不是科技，说明本 skill 适用性有限，并转为通用估值框架建议。
-2. 调用 `mcp_wukong_quant_read_stock_valuation_metrics` 获取结构化估值指标、`series`、`derived`（含归一化 PE/利润质量告警）与 `valuation_percentiles`。
+2. 调用 `mcp_wukong_quant_read_stock_valuation_metrics` 获取结构化估值指标、`series`、`derived`（含归一化 PE/利润质量告警）、`valuation_percentiles` 与 `data_quality`。
 3. 检查 `quality` 与 `derived.profit_quality_alert`：异常净利率做交叉验证；有告警时改用 `derived.normalized_pe_ttm`。
 4. 检查 `segments_series` 分部同比与 `financial.invest_income_yuan`；投资收益占比过高时降权利润表口径。
 5. 调用 `mcp_wukong_quant_read_stock_earnings_consensus` 获取卖方一致预期（替代「全年预测待确认」）。
@@ -112,18 +113,31 @@ prerequisites:
    - 已盈利且增长较快：PEG / PE 与增速交叉验证，优先用 `derived.forward_peg`（前瞻）与 `derived.peg_hist`（历史），并对照 `named_peers` 的同业 PEG。
    - 多业务线差异大：SOTP。优先用 `segments` 的真实分部收入占比；`segments.by_type` 为空或缺失时引用 `missing_notes.financial_mainbz` 标注分部收入缺口，仍须由研究员确认各分部利润与估值倍数。
    - 成熟现金流：DCF + 相对估值。
-10. 输出分级缺失清单（见下方三级标注）和研究员待确认假设。
+10. 输出分级缺失清单（见下方三级标注）和研究员待确认假设；缺失清单只能来自 `data_quality.items[].must_fix=true` 与必要的 `missing_notes`，不得从模板或任意 null 字段自行生成。
 11. 政策风险不在本 skill 范围内：若标的政策敏感（如半导体/创新药/新能源），提示由 `policy_risk` skill 单独梳理，不要在估值包内用模型记忆补政策结论。
 
 ## Missing-item labeling (三级标注)
 
 | 标注 | 何时使用 | 示例 |
 |------|----------|------|
-| `[数据不可用]` | 工具/库中无对应结构化字段 | 缺 `earnings_consensus`、缺 `segments_series` 对应产品线 |
+| `[数据不可用]` | `data_quality.items[].must_fix=true`，或工具明确返回缺集合/缺字段 | 缺 `financial_indicator.grossprofit_margin`、`financial_mainbz`、一致预期 Q4 样本不足 |
 | `[需披露检索: …]` | 需年报/业绩会/公告原文，非财务库标准科目 | 投资收益明细穿透、ARPU、会员数、AI 商业化时间表 |
 | `[待研究员判断]` | 价值假设/目标区间，工具无法代填 | 目标 PS 区间假设、中长期利润率假设 |
 
 禁止把已有工具字段标为 `[待研究员确认]`。PE/PS 区间、一致预期、投资收益占比、FCF 季节性、分部增速均应先查工具。
+
+`data_quality.status` 解释：
+
+| status | 报告写法 |
+|--------|----------|
+| `missing_collection` | `[数据不可用]`，说明缺哪张表，并附 `repair_command` |
+| `missing_field` | `[数据不可用]`，说明缺哪个字段，并附 `repair_command` |
+| `insufficient_history` | `[数据不可用] 样本不足`，说明所需历史窗口，并附 `repair_command` |
+| `insufficient_consensus` | `[数据不可用] 一致预期样本不足`，附 `repair_command` |
+| `not_triggered` | 只在正文写“未触发/未发现异常”，不得进入缺失清单 |
+| `not_applicable` | 只写“当前口径不适用”，不得进入缺失清单 |
+
+缺失信息清单必须优先列 `metric/problem/repair_command`。没有 `repair_command` 的 `[需披露检索]` 项才进入披露检索清单。
 
 ## Source annotation
 
@@ -144,6 +158,7 @@ prerequisites:
 | 投资收益科目 | `[stock_valuation_metrics: financial.invest_income_yuan]` |
 | 卖方一致预期 | `[stock_earnings_consensus: forecasts_by_quarter.2025Q4.np_median_wan]` |
 | 分部收入 | `[stock_valuation_metrics: segments.by_type.P.items[i].字段名]` |
+| 数据质量/补数命令 | `[stock_valuation_metrics: data_quality.items[i].repair_command]` |
 | 同业横向比较 | `[stock_industry_comparison: metrics.路径]` |
 | 评分工具 | `[stock_score_detail: 字段名]` |
 | 历史分析 | `[analysis_history: 字段名]` |
@@ -204,18 +219,23 @@ prerequisites:
 - PEG / PE（含 forward_peg 与同业 PEG 对照）：
 - SOTP：
 
-## 8. 缺失信息清单（分级）
-- [数据不可用] …
-- [需披露检索] …（ARPU/会员数/投资明细穿透/战略时间表）
-- [待研究员判断] …（价值假设）
+## 8. 数据质量与补数清单
+| 项 | status | 问题说明 | 补数命令 |
+|----|--------|----------|----------|
+| [数据不可用] metric | missing_field / insufficient_history / ... | problem | repair_command |
 
-## 9. 研究员待确认假设
+> 只列 `data_quality.items[].must_fix=true` 的项；`not_triggered`/`not_applicable` 只在正文说明，不进入本表。
+
+## 9. 需披露检索清单
+- [需披露检索] …（ARPU/会员数/投资明细穿透/战略时间表）
+
+## 10. 研究员待确认假设
 - 收入增速假设：
 - 中长期利润率假设：
 - 目标 PS/PE 区间：
 - 研发投入资本化/费用化处理：
 
-## 10. 下一步尽调清单
+## 11. 下一步尽调清单
 1. ...
 2. ...
 3. ...
