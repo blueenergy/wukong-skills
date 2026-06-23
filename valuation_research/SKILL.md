@@ -1,7 +1,7 @@
 ---
 name: valuation_research
 description: A股科技企业单股估值研究，生成面向研究员/内部PM的估值输入包。Use when the user asks 估值研究、估值框架、某股票怎么估值、科技股估值、PS/研发强度/FCF/Rule of 40, especially for A-share technology companies.
-version: 0.3.0
+version: 0.4.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -45,7 +45,8 @@ prerequisites:
 
 | 工具 | 用途 |
 |------|------|
-| `mcp_wukong_quant_read_stock_valuation_metrics` | 首选。单股 PS、PE/PB、研发强度、毛利率、FCFF margin、收入增速、Rule of 40；含 `series`(近 N 期)、`quality`(利润/现金流/资产效率质量指标)、`segments`(最新一期主营构成 P/D/I 分部收入占比)、`valuation_percentiles`(PE/PB/PS 自身历史分位)、`missing` 与 `missing_notes` |
+| `mcp_wukong_quant_read_stock_valuation_metrics` | 首选。单股 PS、PE/PB、研发强度、毛利率、FCFF margin、收入增速、Rule of 40；含 `series`(近 N 期)、`quality`(利润/现金流/资产效率)、`derived`(含 `normalized_pe_ttm`/`profit_quality_alert`/`fcff_seasonality_note`)、`segments`/`segments_series`(分部占比与同比)、`valuation_percentiles`、`missing` 与 `missing_notes` |
+| `mcp_wukong_quant_read_stock_earnings_consensus` | 单股卖方一致预期。按预测财年(`quarter` 如 2025Q4)聚合净利/营收/EPS 中位数、评级分布、覆盖机构；用于替代「全年一致预期待确认」 |
 | `mcp_wukong_quant_read_stock_industry_comparison` | 单股同业横向比较。按 `sw_l2` 优先、缺失自动降级，返回 PE/PB/PS、市值、ROE、利润率、收入增速的同业中位数与分位；分位含自身，估值倍数仅统计正值、财务指标含负值，`peer_percentile`/`peer_median` 为 null 时看 `sample_count` 与 `notes` |
 | `mcp_wukong_quant_read_stock_score_detail` | 单股六维评分，辅助判断成长/价值/基本面是否一致 |
 | `mcp_wukong_quant_read_analysis_history` | 历史深度分析，补充已有结论和风险 |
@@ -54,6 +55,8 @@ prerequisites:
 | `mcp_wukong_quant_actions_deep_analysis` | 必要时触发深度分析；不要默认触发 |
 
 工具失败时，报告工具名、参数和错误。缺字段优先引用 `missing_notes` 的可读说明，并写 `[数据不可用]`，不要让 LLM 补数字。
+
+**硬规则：有工具数据时禁止标 `[待研究员确认]`**。必须先查 `quality` / `series` / `derived` / `industry_comparison` / `earnings_consensus`；只有工具确实无数据或需要价值判断时才用下方三级标注。
 
 ## Metric interpretation rules
 
@@ -78,6 +81,11 @@ prerequisites:
 - FCFF margin 与 `fcff_positive_periods/fcff_sample_periods`：正值期数占比低 = 现金流不稳定，DCF 降权的核心依据。
 - Rule of 40：仅作质量粗筛（增速%+利润率%≥40 为佳），不是估值目标，必须注明口径(净利/FCFF)。
 - 分部收入（`segments`）：用 `by_type.P/D/I` 的 `share_pct` 描述收入结构集中度与多元化，判断是否需要 SOTP；`share_pct` 为净额占比，负的抵消项属正常，单一分部占比过高要点出集中风险。
+- 分部增速（`segments_series`）：用 `by_type.P.items[].yoy_pct` 判断某产品线是否快于整体 `revenue_growth_pct`；无对应 `bz_item` 时标 `[数据不可用: financial_mainbz 无对应产品线]`，不得猜测 WPS365 等增速。
+- 归一化 PE（`derived.normalized_pe_ttm`）：当 `investincome_of_ebt > 50%` 或单季净利率异常时，**必须**引用 `derived.profit_quality_alert` 与 `normalized_pe_ttm`，禁止用失真单季 PE 作主结论；同时可对照 `market.pe_ttm` 说明口径差异。
+- 投资收益科目（`financial.invest_income_yuan` / `invest_income_to_revenue_pct`）：量化利润表投资收益规模；**不能**据此拆分理财/股权/参股明细，穿透需标 `[需披露检索: 年报附注/业绩会]`。
+- FCFF 季节性（`derived.fcff_seasonality_note`）：Q1 FCFF 为负时必须先引用此字段与 `series` 多期 `fcff_yuan`，再判断 DCF 权重。
+- 卖方一致预期（`earnings_consensus`）：`forecasts_by_quarter` 给出各预测财年净利/营收/EPS 中位数；有数据则引用，无数据标 `[数据不可用]`。
 
 ## DCF de-weighting rules
 
@@ -90,18 +98,30 @@ prerequisites:
 ## Analysis workflow
 
 1. 识别股票与科技子类。若行业明显不是科技，说明本 skill 适用性有限，并转为通用估值框架建议。
-2. 调用 `mcp_wukong_quant_read_stock_valuation_metrics` 获取结构化估值指标、`series` 与 `valuation_percentiles`。
-3. 检查 `quality` 结构：对异常净利率/利润增速做 `profit_quality` 交叉验证；对现金流指标偏低做 `cash_flow_quality` 降权说明；`asset_efficiency` 仅作资产效率 proxy。
-4. 调用 `mcp_wukong_quant_read_stock_industry_comparison` 获取同业横向分位；若 `peer_count` 太少或分位为 null，明确写样本不足。
-5. 调用 `mcp_wukong_quant_read_stock_score_detail` 和历史分析补充语境。
-6. 用上面的「DCF de-weighting rules」判断 DCF 权重，并引用具体期数/数值。
-7. 选择科技估值框架：
+2. 调用 `mcp_wukong_quant_read_stock_valuation_metrics` 获取结构化估值指标、`series`、`derived`（含归一化 PE/利润质量告警）与 `valuation_percentiles`。
+3. 检查 `quality` 与 `derived.profit_quality_alert`：异常净利率做交叉验证；有告警时改用 `derived.normalized_pe_ttm`。
+4. 检查 `segments_series` 分部同比与 `financial.invest_income_yuan`；投资收益占比过高时降权利润表口径。
+5. 调用 `mcp_wukong_quant_read_stock_earnings_consensus` 获取卖方一致预期（替代「全年预测待确认」）。
+6. 调用 `mcp_wukong_quant_read_stock_industry_comparison` 获取同业横向分位；若 `peer_count` 太少或分位为 null，明确写样本不足。
+7. 调用 `mcp_wukong_quant_read_stock_score_detail` 和历史分析补充语境。
+8. 用「DCF de-weighting rules」判断 DCF 权重，引用 `derived.fcff_seasonality_note` 与具体期数/数值。
+9. 选择科技估值框架：
    - 收入高增长且利润未稳定：PS / EV-Sales / 增速-倍数匹配。
    - 已盈利且增长较快：PEG / PE 与增速交叉验证。
    - 多业务线差异大：SOTP。优先用 `segments` 的真实分部收入占比；`segments.by_type` 为空或缺失时引用 `missing_notes.financial_mainbz` 标注分部收入缺口，仍须由研究员确认各分部利润与估值倍数。
    - 成熟现金流：DCF + 相对估值。
-8. 输出缺失信息清单（引用 `missing_notes`）和研究员待确认假设。
-9. 政策风险不在本 skill 范围内：若标的政策敏感（如半导体/创新药/新能源），提示由 `policy_risk` skill 单独梳理，不要在估值包内用模型记忆补政策结论。
+10. 输出分级缺失清单（见下方三级标注）和研究员待确认假设。
+11. 政策风险不在本 skill 范围内：若标的政策敏感（如半导体/创新药/新能源），提示由 `policy_risk` skill 单独梳理，不要在估值包内用模型记忆补政策结论。
+
+## Missing-item labeling (三级标注)
+
+| 标注 | 何时使用 | 示例 |
+|------|----------|------|
+| `[数据不可用]` | 工具/库中无对应结构化字段 | 缺 `earnings_consensus`、缺 `segments_series` 对应产品线 |
+| `[需披露检索: …]` | 需年报/业绩会/公告原文，非财务库标准科目 | 投资收益明细穿透、ARPU、会员数、AI 商业化时间表 |
+| `[待研究员判断]` | 价值假设/目标区间，工具无法代填 | 目标 PS 区间假设、中长期利润率假设 |
+
+禁止把已有工具字段标为 `[待研究员确认]`。PE/PS 区间、一致预期、投资收益占比、FCF 季节性、分部增速均应先查工具。
 
 ## Source annotation
 
@@ -115,13 +135,18 @@ prerequisites:
 | 财务质量 | `[stock_valuation_metrics: quality.profit_quality.字段名]` |
 | 现金流质量 | `[stock_valuation_metrics: quality.cash_flow_quality.字段名]` |
 | 资产效率 | `[stock_valuation_metrics: quality.asset_efficiency.字段名]` |
+| 归一化 PE / 告警 | `[stock_valuation_metrics: derived.normalized_pe_ttm]` / `derived.profit_quality_alert` |
+| 分部同比 | `[stock_valuation_metrics: segments_series.by_type.P.items[i].yoy_pct]` |
+| 投资收益科目 | `[stock_valuation_metrics: financial.invest_income_yuan]` |
+| 卖方一致预期 | `[stock_earnings_consensus: forecasts_by_quarter.2025Q4.np_median_wan]` |
 | 分部收入 | `[stock_valuation_metrics: segments.by_type.P.items[i].字段名]` |
 | 同业横向比较 | `[stock_industry_comparison: metrics.路径]` |
 | 评分工具 | `[stock_score_detail: 字段名]` |
 | 历史分析 | `[analysis_history: 字段名]` |
 | 行业估值分位 | `[shenwan_index: 字段名]` |
 | 模型判断 | `[模型推断]` |
-| 需要人工确认 | `[待研究员确认]` |
+| 需披露检索 | `[需披露检索: 年报/业绩会/公告]` |
+| 待研究员判断 | `[待研究员判断]` |
 | 缺字段 | `[数据不可用]` |
 
 严禁在报告末尾笼统写数据来源；每个具体数字应逐条标注。
@@ -145,36 +170,43 @@ prerequisites:
 - 收入增速（含同业分位）：
 - 研发强度：
 - 毛利率 / 净利率：
-- FCFF margin（及正值期数/样本期数）：
+- 归一化 PE TTM（含与 market.pe_ttm 口径对比）：
+- 利润质量告警（如有）：
+- FCFF margin（及正值期数/样本期数/季节性说明）：
 - Rule of 40：
 
 ## 3. 财务质量分析
-- 利润质量（单季净利率/扣非比/利润结构）：
+- 利润质量（单季净利率/扣非比/利润结构/投资收益占比）：
 - 现金流质量（销售收现比/经营现金流比/同比）：
 - 资产效率 proxy（固定资产/周转率/ROIC，不作产能利用率断言）：
+- 投资收益科目（invest_income，非明细穿透）：
 
-## 4. 模型适用性
+## 4. 卖方一致预期
+- 各预测财年净利/营收/EPS 中位数（来自 earnings_consensus）：
+- 评级分布与覆盖机构数：
+
+## 5. 分部收入与增速
+- 按产品/地区/行业占比（segments）：
+- 产品线同比增速（segments_series，缺失则标注）：
+
+## 6. 模型适用性
 - DCF（含降权依据：FCFF 正值期数 / 样本期数）：
 - PS / EV-Sales：
 - PEG / PE：
 - SOTP：
 
-## 5. 分部收入结构
-- 按产品/地区/行业占比（来自 segments，缺失则标注）：
+## 7. 缺失信息清单（分级）
+- [数据不可用] …
+- [需披露检索] …（ARPU/会员数/投资明细穿透/战略时间表）
+- [待研究员判断] …（价值假设）
 
-## 6. 缺失信息清单
-- 分部利润/分部估值倍数：
-- 订单/在手订单：
-- 客户集中度：
-- 单位经济/订阅指标：
-
-## 7. 研究员待确认假设
+## 8. 研究员待确认假设
 - 收入增速假设：
 - 中长期利润率假设：
 - 目标 PS/PE 区间：
 - 研发投入资本化/费用化处理：
 
-## 8. 下一步尽调清单
+## 9. 下一步尽调清单
 1. ...
 2. ...
 3. ...
