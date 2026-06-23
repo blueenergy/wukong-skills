@@ -45,7 +45,7 @@ prerequisites:
 
 | 工具 | 用途 |
 |------|------|
-| `mcp_wukong_quant_read_stock_valuation_metrics` | 首选。单股 PS、PE/PB、研发强度、毛利率、FCFF margin、收入增速、Rule of 40；含 `series`(近 N 期)、`valuation_percentiles`(PE/PB/PS 自身历史分位)、`missing` 与 `missing_notes` |
+| `mcp_wukong_quant_read_stock_valuation_metrics` | 首选。单股 PS、PE/PB、研发强度、毛利率、FCFF margin、收入增速、Rule of 40；含 `series`(近 N 期)、`segments`(最新一期主营构成 P/D/I 分部收入占比)、`valuation_percentiles`(PE/PB/PS 自身历史分位)、`missing` 与 `missing_notes` |
 | `mcp_wukong_quant_read_stock_industry_comparison` | 单股同业横向比较。按 `sw_l2` 优先、缺失自动降级，返回 PE/PB/PS、市值、ROE、利润率、收入增速的同业中位数与分位；分位含自身，估值倍数仅统计正值、财务指标含负值，`peer_percentile`/`peer_median` 为 null 时看 `sample_count` 与 `notes` |
 | `mcp_wukong_quant_read_stock_score_detail` | 单股六维评分，辅助判断成长/价值/基本面是否一致 |
 | `mcp_wukong_quant_read_analysis_history` | 历史深度分析，补充已有结论和风险 |
@@ -65,6 +65,7 @@ prerequisites:
 - 毛利率 / 净利率：毛利率反映商业模式，净利率受研发/费用影响；二者背离要点出。
 - FCFF margin 与 `fcff_positive_periods/fcff_sample_periods`：正值期数占比低 = 现金流不稳定，DCF 降权的核心依据。
 - Rule of 40：仅作质量粗筛（增速%+利润率%≥40 为佳），不是估值目标，必须注明口径(净利/FCFF)。
+- 分部收入（`segments`）：用 `by_type.P/D/I` 的 `share_pct` 描述收入结构集中度与多元化，判断是否需要 SOTP；`share_pct` 为净额占比，负的抵消项属正常，单一分部占比过高要点出集中风险。
 
 ## DCF de-weighting rules
 
@@ -84,7 +85,7 @@ prerequisites:
 6. 选择科技估值框架：
    - 收入高增长且利润未稳定：PS / EV-Sales / 增速-倍数匹配。
    - 已盈利且增长较快：PEG / PE 与增速交叉验证。
-   - 多业务线差异大：SOTP，但必须标注分部收入缺口。
+   - 多业务线差异大：SOTP。优先用 `segments` 的真实分部收入占比；`segments.by_type` 为空或缺失时引用 `missing_notes.financial_mainbz` 标注分部收入缺口，仍须由研究员确认各分部利润与估值倍数。
    - 成熟现金流：DCF + 相对估值。
 7. 输出缺失信息清单（引用 `missing_notes`）和研究员待确认假设。
 
@@ -97,6 +98,7 @@ prerequisites:
 | 估值指标工具 | `[stock_valuation_metrics: 字段名]` |
 | 历史分位 | `[stock_valuation_metrics: valuation_percentiles.字段名]` |
 | 多期序列 | `[stock_valuation_metrics: series[i].字段名]` |
+| 分部收入 | `[stock_valuation_metrics: segments.by_type.P.items[i].字段名]` |
 | 同业横向比较 | `[stock_industry_comparison: metrics.路径]` |
 | 评分工具 | `[stock_score_detail: 字段名]` |
 | 历史分析 | `[analysis_history: 字段名]` |
@@ -135,19 +137,22 @@ prerequisites:
 - PEG / PE：
 - SOTP：
 
-## 4. 缺失信息清单
-- 分部收入：
+## 4. 分部收入结构
+- 按产品/地区/行业占比（来自 segments，缺失则标注）：
+
+## 5. 缺失信息清单
+- 分部利润/分部估值倍数：
 - 订单/在手订单：
 - 客户集中度：
 - 单位经济/订阅指标：
 
-## 5. 研究员待确认假设
+## 6. 研究员待确认假设
 - 收入增速假设：
 - 中长期利润率假设：
 - 目标 PS/PE 区间：
 - 研发投入资本化/费用化处理：
 
-## 6. 下一步尽调清单
+## 7. 下一步尽调清单
 1. ...
 2. ...
 3. ...
