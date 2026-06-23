@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [industry-research, A-share, market-analysis, valuation, strategy]
-    related_skills: [wukong-quant]
+    related_skills: [wukong-quant, policy_risk]
 ---
 
 # Industry Research Auto (Automatic Industry Analysis)
@@ -47,6 +47,8 @@ Automatically perform deep, structured industry research when triggered by user 
 - 每获取一批数据，记录工具名、参数和返回的原始字段
 - 如果某工具无可用数据，明确标注 `[数据不可用]`
 - 供需/产能/商品价格数据实时接口不可用，此类数据来自 `[模型推断]` 或 `[web_search]`，须注明"建议以最新公开数据核验"
+
+> 步骤6（风险）若涉及政策/监管深度梳理，优先用 `policy_risk` skill 产出逐条标注来源的政策清单与传导链，再把净结论引入本报告，不要用模型记忆笼统断言政策影响。
 
 ## Analysis framework (strictly follow this structure)
 1. Industry overview & definition

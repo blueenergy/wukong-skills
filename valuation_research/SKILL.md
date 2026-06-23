@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [valuation, A-share, stock-research, technology, PS, FCF]
-    related_skills: [wukong-quant, industry_research]
+    related_skills: [wukong-quant, industry_research, policy_risk]
 prerequisites:
   mcp_servers: [wukong-quant-read, wukong-quant-actions]
 ---
@@ -88,6 +88,7 @@ prerequisites:
    - 多业务线差异大：SOTP。优先用 `segments` 的真实分部收入占比；`segments.by_type` 为空或缺失时引用 `missing_notes.financial_mainbz` 标注分部收入缺口，仍须由研究员确认各分部利润与估值倍数。
    - 成熟现金流：DCF + 相对估值。
 7. 输出缺失信息清单（引用 `missing_notes`）和研究员待确认假设。
+8. 政策风险不在本 skill 范围内：若标的政策敏感（如半导体/创新药/新能源），提示由 `policy_risk` skill 单独梳理，不要在估值包内用模型记忆补政策结论。
 
 ## Source annotation
 
