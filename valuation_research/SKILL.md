@@ -1,7 +1,7 @@
 ---
 name: valuation_research
 description: A股科技企业单股估值研究，生成面向研究员/内部PM的估值输入包。Use when the user asks 估值研究、估值框架、某股票怎么估值、科技股估值、PS/研发强度/FCF/Rule of 40, especially for A-share technology companies.
-version: 0.6.0
+version: 0.7.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -45,7 +45,7 @@ prerequisites:
 
 | 工具 | 用途 |
 |------|------|
-| `mcp_wukong_quant_read_stock_valuation_metrics` | 首选。单股 PS、PE/PB、研发强度、毛利率、FCFF margin、收入增速、Rule of 40；含 `series`(近 N 期)、`quality`(利润/现金流/资产效率)、`derived`(含 `normalized_pe_ttm`/`profit_quality_alert`/`fcff_seasonality_note`/`peg_hist`/`forward_pe`/`forward_peg`/`forward_growth`)、`segments`/`segments_series`(分部占比与同比)、`valuation_percentiles`、`missing`/`missing_notes` 与 `data_quality`(缺失原因、影响指标、补数命令) |
+| `mcp_wukong_quant_read_stock_valuation_metrics` | 首选。单股 PS、PE/PB、研发强度、毛利率、FCFF margin、收入增速、Rule of 40；含 `series`(近 N 期)、`quality`(利润/现金流/资产效率)、`derived`(含 `normalized_pe_ttm`/`profit_quality_alert`/`fcff_seasonality_note`/`peg_hist`/`forward_pe`/`forward_peg`/`forward_growth`)、`cash_flow`(EBITDA→OCF→FCF 多口径桥接+归因，含 `per_share`/`absolute_yi`/`bridge`/`note`)、`segments`/`segments_series`(分部占比与同比)、`valuation_percentiles`、`missing`/`missing_notes` 与 `data_quality`(缺失原因、影响指标、补数命令) |
 | `mcp_wukong_quant_read_stock_earnings_consensus` | 单股卖方一致预期。按预测财年(`quarter` 如 2025Q4)聚合净利/营收/EPS 中位数、评级分布、覆盖机构；用于替代「全年一致预期待确认」 |
 | `mcp_wukong_quant_read_stock_industry_comparison` | 单股同业横向比较。按 `sw_l2` 优先、缺失自动降级，返回 PE/PB/PS/**PEG**、市值、ROE、利润率、收入增速的同业中位数与分位；`named_peers` 给出点名同业并排(默认市值 Top N，传 `peer_symbols=603039.SH,600588.SH` 用指定名单，可跨行业)的 `pe_ttm/ps_ttm/peg/净利率/增速`；分位含自身，估值倍数/PEG 仅统计正值、财务指标含负值，`peer_percentile`/`peer_median` 为 null 时看 `sample_count` 与 `notes` |
 | `mcp_wukong_quant_read_stock_score_detail` | 单股六维评分，辅助判断成长/价值/基本面是否一致 |
@@ -78,13 +78,18 @@ prerequisites:
   - `fixed_assets` / `total_fa_trun`：仅为资产效率 proxy，**不得**直接断言为产能利用率；
   - `capitalized_to_da`：研发资本化程度参考；
   - `roic_yearly`：年化投入资本回报率，辅助判断资本配置效率。
-- FCFF margin 与 `fcff_positive_periods/fcff_sample_periods`：正值期数占比低 = 现金流不稳定，DCF 降权的核心依据。
+- 现金流口径（`cash_flow`，**强约束**）：现金流叙事一律以 `cash_flow` 块为准，不得用单一 `fcff` 绝对值下结论。
+  - **每股口径不可混用**：`cash_flow.per_share.ocfps`=每股经营现金流；`fcff_ps/fcfe_ps` 是 Tushare 现金流口径每股自由现金流(≈OCF-资本开支)，与同花顺/学术 FCFF(加回折旧摊销、仅扣维持性 capex)不同口径。**严禁用 ocfps 代替自由现金流，严禁用绝对 fcff 推每股**。
+  - **三口径并列**：引用 `absolute_yi` 的 `ebitda`(造血潜力，对应同花顺式不扣capex口径) / `ocf`(经营到手现金) / `fcf_strict`(扣全额capex，偏保守)，必须说明三者口径差异，不能只甩一个数。
+  - **负 FCF 必须归因**：`fcf_strict<0` 时引用 `cash_flow.bridge` 与 `cash_flow.note` 拆出主因（营运资本占用 `working_capital_change` / 资本开支 `capex`）。**当 EBITDA>0 且负 FCF 由扩张 capex 或营运资本占用驱动时，禁止表述为「现金流恶化/衰退信号」**，只能说「投入扩张期/营运资本占用，现金被占用」。
+  - **理财勿张冠李戴**：定期存款/理财进出多记在投资活动 `absolute_yi.invest_wealth_mgmt_pay/recv`，不影响 OCF；不得把营运资本占用误归因为「买理财/定存」。
+- FCFF margin 与 `fcff_positive_periods/fcff_sample_periods`：正值期数占比低 = 现金流不稳定，DCF 降权参考；注意 `fcff` 为 Tushare 现金流口径(≈OCF-capex)，结论需与 `cash_flow.note` 一致，勿据此单独判定盈利恶化。
 - Rule of 40：仅作质量粗筛（增速%+利润率%≥40 为佳），不是估值目标，必须注明口径(净利/FCFF)。
 - 分部收入（`segments`）：用 `by_type.P/D/I` 的 `share_pct` 描述收入结构集中度与多元化，判断是否需要 SOTP；`share_pct` 为净额占比，负的抵消项属正常，单一分部占比过高要点出集中风险。
 - 分部增速（`segments_series`）：用 `by_type.P.items[].yoy_pct` 判断某产品线是否快于整体 `revenue_growth_pct`；无对应 `bz_item` 时标 `[数据不可用: financial_mainbz 无对应产品线]`，不得猜测 WPS365 等增速。
 - 归一化 PE（`derived.normalized_pe_ttm`）：当 `investincome_of_ebt > 50%` 或单季净利率异常时，**必须**引用 `derived.profit_quality_alert` 与 `normalized_pe_ttm`，禁止用失真单季 PE 作主结论；同时可对照 `market.pe_ttm` 说明口径差异。
 - 投资收益科目（`financial.invest_income_yuan` / `invest_income_to_revenue_pct`）：量化利润表投资收益规模；**不能**据此拆分理财/股权/参股明细，穿透需标 `[需披露检索: 年报附注/业绩会]`。
-- FCFF 季节性（`derived.fcff_seasonality_note`）：Q1 FCFF 为负时必须先引用此字段与 `series` 多期 `fcff_yuan`，再判断 DCF 权重。
+- FCFF 季节性（`derived.fcff_seasonality_note`）：Q1 FCFF 为负时必须先引用此字段与 `series` 多期 `fcff_yuan`，再判断 DCF 权重；该字段为 Tushare 现金流口径，最终现金流结论以 `cash_flow.note` 为准。
 - 卖方一致预期（`earnings_consensus`）：`forecasts_by_quarter` 给出各预测财年净利/营收/EPS 中位数；有数据则引用，无数据标 `[数据不可用]`。
 - PEG（`derived.peg_hist` / `derived.forward_peg`）：自身 PEG **必须**用工具值，不得手算。`peg_hist=pe_ttm/净利同比`（历史口径）；`forward_peg=forward_pe/一致净利增速`（前瞻口径，依赖 `earnings_consensus`，更贴卖方）。两者都为 null 时（净利增速≤0 等）才说明 PEG 不适用，并改用 PS/增速匹配。
 - 点名同业 PS/PEG（`stock_industry_comparison.named_peers`）：当用户/报告要求「对比某某同业的 PS 和 PEG」时，**禁止**标待确认，必须传 `peer_symbols` 调用本工具，引用 `named_peers[].ps_ttm` 与 `named_peers[].peg` 做并排；`named_peers` 的 `peg` 为历史口径，前瞻 PEG 仅目标股有，对比时要注明口径。同业个体增速≤0 时其 `peg` 为 null，照实说明而非补数。
@@ -96,6 +101,7 @@ prerequisites:
 
 - DCF 降权（不作为主框架）：`fcff_positive_periods / fcff_sample_periods < 0.5`，或最新净利率≤0，或收入增速≥20% 且利润未稳定。话术示例：“现金流样本中仅 X/Y 期 FCFF 为正，DCF 不宜作为主估值，仅供方向性参考”。
 - DCF 可作交叉验证：FCFF 多期为正且 `series` 中增速与利润率趋稳。
+- 负 FCF 降权时必须区分性质（依据 `cash_flow.note`）：扩张 capex / 营运资本占用驱动且 EBITDA>0 → 说明「投入期占用」，不得当盈利恶化；EBITDA 亦非正 → 才是真实现金流压力。
 - 任何情况下都不要用银行/保险/证券口径套 FCFF DCF；若标的是金融，直接说明应转 PB-ROE / DDM。
 
 ## Analysis workflow
@@ -107,7 +113,7 @@ prerequisites:
 5. 调用 `mcp_wukong_quant_read_stock_earnings_consensus` 获取卖方一致预期（替代「全年预测待确认」）。
 6. 调用 `mcp_wukong_quant_read_stock_industry_comparison` 获取同业横向分位与 `named_peers` 并排（PS/PEG/PE）；用户点名了同业则传 `peer_symbols`，否则用默认市值 Top N。若 `peer_count` 太少或分位为 null，明确写样本不足。
 7. 调用 `mcp_wukong_quant_read_stock_score_detail` 和历史分析补充语境。
-8. 用「DCF de-weighting rules」判断 DCF 权重，引用 `derived.fcff_seasonality_note` 与具体期数/数值。
+8. 用「DCF de-weighting rules」判断 DCF 权重，引用 `cash_flow`（EBITDA/OCF/FCF 三口径 + `bridge` + `note`）说明现金流口径与负 FCF 归因，再结合 `derived.fcff_seasonality_note` 与具体期数/数值。
 9. 选择科技估值框架：
    - 收入高增长且利润未稳定：PS / EV-Sales / 增速-倍数匹配。
    - 已盈利且增长较快：PEG / PE 与增速交叉验证，优先用 `derived.forward_peg`（前瞻）与 `derived.peg_hist`（历史），并对照 `named_peers` 的同业 PEG。
@@ -152,6 +158,8 @@ prerequisites:
 | 现金流质量 | `[stock_valuation_metrics: quality.cash_flow_quality.字段名]` |
 | 资产效率 | `[stock_valuation_metrics: quality.asset_efficiency.字段名]` |
 | 归一化 PE / 告警 | `[stock_valuation_metrics: derived.normalized_pe_ttm]` / `derived.profit_quality_alert` |
+| 现金流口径/每股 | `[stock_valuation_metrics: cash_flow.per_share.ocfps]` / `cash_flow.absolute_yi.fcf_strict` |
+| 现金流桥接/归因 | `[stock_valuation_metrics: cash_flow.bridge]` / `cash_flow.note` |
 | PEG（历史/前瞻） | `[stock_valuation_metrics: derived.peg_hist]` / `derived.forward_peg` |
 | 点名同业并排 | `[stock_industry_comparison: named_peers[i].ps_ttm]` / `named_peers[i].peg` |
 | 分部同比 | `[stock_valuation_metrics: segments_series.by_type.P.items[i].yoy_pct]` |
@@ -194,6 +202,7 @@ prerequisites:
 - 利润质量告警（如有）：
 - FCFF margin（及正值期数/样本期数/季节性说明）：
 - Rule of 40：
+- 现金流口径（cash_flow：每股 ocfps / fcff_ps；EBITDA / OCF / FCF 三口径 + 负FCF归因 note）：
 
 ## 3. 同业横向对比
 - 同业 PS/PE/PEG 中位数与分位（industry_comparison.metrics）：
@@ -214,7 +223,7 @@ prerequisites:
 - 产品线同比增速（segments_series，缺失则标注）：
 
 ## 7. 模型适用性
-- DCF（含降权依据：FCFF 正值期数 / 样本期数）：
+- DCF（含降权依据：FCFF 正值期数 / 样本期数；现金流口径与负 FCF 归因引用 cash_flow.note）：
 - PS / EV-Sales：
 - PEG / PE（含 forward_peg 与同业 PEG 对照）：
 - SOTP：
