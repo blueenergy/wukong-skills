@@ -46,6 +46,7 @@ prerequisites:
 | 工具 | 用途 |
 |------|------|
 | `mcp_wukong_quant_read_stock_valuation_metrics` | 首选。单股 PS、PE/PB、研发强度、毛利率、FCFF margin、收入增速、Rule of 40；含 `series`(近 N 期)、`valuation_percentiles`(PE/PB/PS 自身历史分位)、`missing` 与 `missing_notes` |
+| `mcp_wukong_quant_read_stock_industry_comparison` | 单股同业横向比较。按 `sw_l2` 优先、缺失自动降级，返回 PE/PB/PS、市值、ROE、利润率、收入增速的同业中位数与分位；分位含自身，估值倍数仅统计正值、财务指标含负值，`peer_percentile`/`peer_median` 为 null 时看 `sample_count` 与 `notes` |
 | `mcp_wukong_quant_read_stock_score_detail` | 单股六维评分，辅助判断成长/价值/基本面是否一致 |
 | `mcp_wukong_quant_read_analysis_history` | 历史深度分析，补充已有结论和风险 |
 | `mcp_wukong_quant_read_shenwan_index` | 申万行业 PE/PB 分位，提供行业估值背景 |
@@ -58,7 +59,7 @@ prerequisites:
 
 读 `stock_valuation_metrics` 时按以下规则解释，不要把单一指标直接等同于高估/低估：
 
-- PS / PS 分位：PS 高低必须配合收入增速与毛利率一起看。高 PS 只有在高增速 + 高毛利时才合理；用 `valuation_percentiles.ps_ttm` 说明“贵/便宜”是相对自身历史，而非绝对结论。
+- PS / PS 分位：PS 高低必须配合收入增速与毛利率一起看。高 PS 只有在高增速 + 高毛利时才合理；用 `valuation_percentiles.ps_ttm` 说明“贵/便宜”是相对自身历史，用 `stock_industry_comparison.metrics.market.ps_ttm.peer_percentile` 说明相对同业位置。
 - 收入增速（`revenue_growth_pct` 与 `series`）：看趋势与稳定性，不只看最新一期。增速是否在 `series` 里持续下滑要明确指出。
 - 研发强度（`rd_intensity_pct`）：高研发强度说明当期利润被研发压制，应提示“用 PS / 调整后利润”而不是直接用 PE。
 - 毛利率 / 净利率：毛利率反映商业模式，净利率受研发/费用影响；二者背离要点出。
@@ -77,14 +78,15 @@ prerequisites:
 
 1. 识别股票与科技子类。若行业明显不是科技，说明本 skill 适用性有限，并转为通用估值框架建议。
 2. 调用 `mcp_wukong_quant_read_stock_valuation_metrics` 获取结构化估值指标、`series` 与 `valuation_percentiles`。
-3. 调用 `mcp_wukong_quant_read_stock_score_detail` 和历史分析补充语境。
-4. 用上面的「DCF de-weighting rules」判断 DCF 权重，并引用具体期数/数值。
-5. 选择科技估值框架：
+3. 调用 `mcp_wukong_quant_read_stock_industry_comparison` 获取同业横向分位；若 `peer_count` 太少或分位为 null，明确写样本不足。
+4. 调用 `mcp_wukong_quant_read_stock_score_detail` 和历史分析补充语境。
+5. 用上面的「DCF de-weighting rules」判断 DCF 权重，并引用具体期数/数值。
+6. 选择科技估值框架：
    - 收入高增长且利润未稳定：PS / EV-Sales / 增速-倍数匹配。
    - 已盈利且增长较快：PEG / PE 与增速交叉验证。
    - 多业务线差异大：SOTP，但必须标注分部收入缺口。
    - 成熟现金流：DCF + 相对估值。
-6. 输出缺失信息清单（引用 `missing_notes`）和研究员待确认假设。
+7. 输出缺失信息清单（引用 `missing_notes`）和研究员待确认假设。
 
 ## Source annotation
 
@@ -95,6 +97,7 @@ prerequisites:
 | 估值指标工具 | `[stock_valuation_metrics: 字段名]` |
 | 历史分位 | `[stock_valuation_metrics: valuation_percentiles.字段名]` |
 | 多期序列 | `[stock_valuation_metrics: series[i].字段名]` |
+| 同业横向比较 | `[stock_industry_comparison: metrics.路径]` |
 | 评分工具 | `[stock_score_detail: 字段名]` |
 | 历史分析 | `[analysis_history: 字段名]` |
 | 行业估值分位 | `[shenwan_index: 字段名]` |
@@ -118,7 +121,9 @@ prerequisites:
 
 ## 2. 结构化估值指标
 - PS TTM（含自身历史分位）：
+- PS TTM（含同业分位）：
 - 收入增速（最新 + 近 N 期趋势）：
+- 收入增速（含同业分位）：
 - 研发强度：
 - 毛利率 / 净利率：
 - FCFF margin（及正值期数/样本期数）：
