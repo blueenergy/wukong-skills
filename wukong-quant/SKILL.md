@@ -48,6 +48,47 @@ prerequisites:
 | 悟空，自选股加 {代码} / 添加到自选 | 将指定股票添加到自选股 |
 | 悟空，自选股删 {代码} / 移除自选 | 从自选股中删除指定股票 |
 | 悟空，自选股历史 / 我的分析记录 | 查询自选股历史深度分析记录 |
+| 悟空，策略对比 / 悟空，回测扫参 | 提交多策略×参数网格对比回测（MCP：`submit_backtest_sweep`） |
+
+## 策略对比回测（MCP）
+
+通过 `wukong-quant-actions` 中的回测扫参工具，一次提交「多策略 × 多预设 ×
+参数网格」对比实验，替代反复单点回测。
+
+### 工具
+
+| 工具 | 用途 |
+|------|------|
+| `backtest_strategies`（read） | 列出策略、预设、参数名与默认值，规划下一组组合前必须先查 |
+| `submit_backtest_sweep` | 提交 compare 批次，立即返回 `batch_id` |
+| `backtest_sweep_status` | 按 `batch_id` 轮询进度并拉取已完成指标行 |
+| `backtest_sweep_wait` | 小网格可一次等待完成（默认 180s，上限 300s）；大网格用 submit + status |
+
+### 鉴权与权限边界
+
+- **必须**配置 `X-User-Token`（用户 JWT）；不允许回退 `hermes-system` 或 body 里的任意 username。
+- `X-Hermes-Quant-Key` 仍作为服务间认证。
+- 工具止步于「创建实验、读结果」：**不提供**部署到实盘、改自选股策略等写入能力。
+
+### 评分与选优口径（Hermes 必读）
+
+首版**没有**后端统一综合分。挑选候选时必须同时看：
+
+- `total_return`（总收益）
+- `max_drawdown`（最大回撤）
+- `sharpe_ratio`（夏普）
+- `total_trades`（交易次数；**&lt; 10 视为样本过少**，不可单凭收益定冠军）
+- `invested_return`、`capital_utilization` 作参考，但资金占用低不等于更差
+
+不要只按单一收益排序宣布「最优策略」。
+
+### 典型工作流
+
+1. 调用 `backtest_strategies` 获取 `turtle` 等策略的参数 schema。
+2. 构造 `combos` 列表（每个 combo 含完整物化后的 `strategy_params`）。
+3. `submit_backtest_sweep`：`symbols × combos ≤ 500`。
+4. 大网格：`backtest_sweep_status` 分页拉全量 `rows`（仅 metrics，无 trades/净值曲线）。
+5. 小网格（≤ 约 10 任务）：可用 `backtest_sweep_wait`。
 
 ## 深度分析工作流
 
