@@ -77,7 +77,7 @@ prerequisites:
 - `total_return`（总收益）
 - `max_drawdown`（最大回撤）
 - `sharpe_ratio`（夏普）
-- `total_trades`（交易次数；**&lt; 10 视为样本过少**，不可单凭收益定冠军）
+- `total_trades`（平仓回合数：买入→卖出算 1 次；**&lt; 10 视为样本过少**，不可单凭收益定冠军。详情买卖明细按委托笔数，通常大于该值）
 - `invested_return`、`capital_utilization` 作参考，但资金占用低不等于更差
 
 不要只按单一收益排序宣布「最优策略」。
