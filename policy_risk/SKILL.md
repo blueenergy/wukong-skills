@@ -1,7 +1,7 @@
 ---
 name: policy_risk
 description: A股个股/行业政策风险研究 — 基于公开政策原文与监管动态，输出逐条标注来源的政策清单、传导链与利好/利空分级。Use when the user asks 政策风险、政策影响、监管风险、政策梳理、某公司/行业受什么政策影响, especially for A-share single stocks or industries.
-version: 0.1.0
+version: 0.2.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -24,7 +24,7 @@ prerequisites:
 - 每条政策必须能追溯到具体来源（机构 + 日期 + 链接/文号），不能把模型记忆当事实。
 - 输出方向判断（利好/利空/不确定）与定性力度，**不强行量化**、不给目标价或买卖建议。
 - 区分事实（政策原文写明）/ 推断（传导链分析）/ 不确定（信息不足），三者分别标注。
-- 这是**联网重度**技能：政策原文以 `web_search` / `web_fetch` 为主，MCP 工具提供宏观与行业背景。
+- 这是**联网重度**技能：政策原文以 `web_search` / `web_fetch` 为主，MCP 工具提供宏观与行业背景。检索受阻时按下方降级路径走，不要用模型记忆填补。
 
 ## Trigger phrases
 
@@ -41,7 +41,9 @@ prerequisites:
 
 ## Tool usage
 
-优先直接调用 MCP 工具与 web 工具，不猜 REST endpoint，不用 terminal/curl 直连。
+优先直接调用 MCP 工具与 web 工具，不猜 REST endpoint。
+
+**政策检索必须由主代理直接执行，不要 `delegate_task` 给子代理** —— 子代理的 `web` toolset 不含 `web_search` / `web_fetch`，委托出去会静默拿不到政策原文。
 
 | 工具 | 用途 |
 |------|------|
@@ -53,6 +55,22 @@ prerequisites:
 | `mcp_wukong_quant_read_industry_comparison`（如可用） | 同业横向，判断政策是普惠还是差异化影响 |
 
 工具失败时，报告工具名、参数和错误。缺信息时写 `[数据不可用]`，不要让 LLM 补内容。
+
+### 政府网站抓取限制
+
+gov.cn 及各部委子域名（mee / ndrc / miit / moa / mofcom 等）的政策内容页返回的是 JS 客户端重定向，
+**`curl` 跟随重定向后拿到的仍是脚本而非正文**，所以 terminal + curl 不是 `web_fetch` 的可行替代。
+需要打开这类页面时用能执行 JS 的抓取方式（`browser_navigate`）。
+
+`references/gov_websites.md` 是一次逐站实测的记录，含具体域名与失败模式。它是**带日期的时点快照**，
+不是长期事实：站点行为会变，引用前先复核，不要据此直接断言某站永久不可用。
+
+检索受阻时的降级顺序：
+
+1. `macro_analysis` + `sector_latest` 拿已结构化的宏观与板块政策方向
+2. 平台内政策数据库（东方财富/同花顺）、行业协会、新闻 API
+3. 已有 gov.cn 链接时用 `browser_navigate` 打开取正文
+4. 仍拿不到就对该条标 `[待核验]`，并在报告开头写明政策原文检索受阻，不要用模型记忆补政策结论
 
 ## Policy source whitelist
 
@@ -80,7 +98,7 @@ Policy risk progress:
 
 1. **锁定标的**：调 `stock_valuation_metrics` 取 `name`/`industry`/`sw_industry`/`segments`；用分部收入确定哪块业务最受政策牵动。行业研究则直接用行业名。
 2. **政策背景**：调 `macro_analysis`、`sector_latest` 获取宏观与板块层面的政策方向。
-3. **检索原文**：用 `web_search` 按来源白名单找政策原文，`web_fetch` 取条款与发文日期；优先近 12–24 个月、与核心业务直接相关的政策。
+3. **检索原文**：用 `web_search` 按来源白名单找政策原文，`web_fetch` 取条款与发文日期；优先近 12–24 个月、与核心业务直接相关的政策。本步由主代理执行，不要委托子代理；抓不到正文时走「政府网站抓取限制」的降级顺序。
 4. **逐条分析**：对每条政策套用下方「Transmission & severity rules」，给出传导链、方向、时效、力度、置信度。
 5. **汇总画像**：统计利好/利空/不确定条数，点出最关键的 1–2 条及理由；指出多空政策是否对冲。
 6. **输出**：按模板交付，列出无法核实的缺口与研究员待确认项。

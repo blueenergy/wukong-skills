@@ -1,7 +1,7 @@
 ---
 name: wukong-quant
 description: 通过悟空量化 MCP 接口调用 A 股深度分析、连板天梯等功能。需配置 wukong-quant-read 和 wukong-quant-actions MCP 服务器。
-version: 1.0.0
+version: 1.1.0
 author: blueenergy
 license: MIT
 metadata:
@@ -334,7 +334,7 @@ filters=[
 | wukong-quant-read | http | `http://localhost:3002/api/mcp` |
 | wukong-quant-actions | http | `http://localhost:3003/api/mcp` |
 
-不要在 host Hermes CLI 配置里使用 `quant-mcp` / `quant-mcp-actions`，这些是 Docker
+不要在 host Hermes CLI 配置里使用 `quant-mcp-read` / `quant-mcp-actions`，这些是 Docker
 网络内服务名，宿主机上通常无法解析。
 
 ### 本地部署：Docker 内 Hermes
@@ -344,8 +344,10 @@ filters=[
 
 | MCP server | transport | url |
 |------------|-----------|-----|
-| wukong-quant-read | http | `http://quant-mcp:3002/api/mcp` |
+| wukong-quant-read | http | `http://quant-mcp-read:3002/api/mcp` |
 | wukong-quant-actions | http | `http://quant-mcp-actions:3003/api/mcp` |
+
+容器名带 `-read` / `-actions` 后缀，没有裸的 `quant-mcp`。宿主机端口 3002/3003 与容器内端口一一对应。
 
 ### 请求头
 
@@ -357,3 +359,30 @@ filters=[
 | `X-User-Token` | 通过 `user_login` 工具获取的 JWT token（可选，仅个人化端点需要） |
 
 自签名证书场景可按 Hermes MCP 配置支持情况设置 `ssl_verify=false`。
+
+密钥只从 `quantFinance/.env` 的 `HERMES_QUANT_INTERNAL_KEY` 读取，不要把明文密钥写进
+skill、示例代码或对话记录里。
+
+### 工具未注入时的排查顺序
+
+session 里没有 `mcp_wukong_quant_*` 工具时，按顺序排查：
+
+1. **容器状态**：`docker ps --format "table {{.Names}}\t{{.Status}}" | grep mcp`。
+   未运行就起 compose；`Restarting` 则看 `docker logs quant-mcp-read` / `quant-mcp-actions`
+   —— 常见原因是依赖版本漂移导致 import 期崩溃。
+2. **宿主机连通性**：`curl -s --max-time 5 -o /dev/null -w "%{http_code}" http://localhost:3002/api/mcp`。
+   401/404/200 说明服务本身正常；超时则查 `docker port quant-mcp-read` 确认端口映射。
+3. **容器内连通性**：Hermes 在容器里时，config 的 URL 必须是服务名
+   `http://quant-mcp-read:3002/api/mcp`，写 `localhost` 在容器内解析不到。
+4. **重新注入**：重载 Hermes window（Ctrl+Shift+P → Developer: Reload Window）或重启 hermes 容器。
+
+### MCP 会话协议
+
+MCP/1.0 是有状态协议，session ID 必须逐请求传递：
+
+1. `POST /api/mcp` 发 `initialize`，响应 header 返回 `mcp-session-id`
+2. 之后所有请求都要带 `mcp-session-id: <id>`
+3. 不带就是 `400 Bad Request: Missing session ID`
+
+典型症状是 `initialize` 返回 200、紧接着 `tools/list` 返回 400 —— 这是 session 没有透传，
+不是服务故障。手写 HTTP 客户端调试时尤其容易踩。

@@ -1,7 +1,7 @@
 ---
 name: valuation_research
 description: A股科技企业单股估值研究，生成面向研究员/内部PM的估值输入包。Use when the user asks 估值研究、估值框架、某股票怎么估值、科技股估值、PS/研发强度/FCF/Rule of 40, especially for A-share technology companies.
-version: 0.7.0
+version: 0.8.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -20,6 +20,7 @@ prerequisites:
 
 - 你是面向 A 股研究员/内部 PM 的单股估值研究助手。
 - 第一版只覆盖科技企业：半导体、软件、互联网、高端制造、硬科技等。
+- **收到股票代码后先查 `stock_valuation_metrics` 的 `sw_industry` 确认公司类型**：申万 L1 属于化工、钢铁、煤炭、银行、保险、房地产、消费等非科技行业时，走下方「Non-tech stock guidance」，不要硬套 PS / 研发强度 / Rule of 40。
 - 输出重点是「当前应采用什么估值框架、结构化数据支持到哪一步、还缺哪些关键输入」。
 - 不直接输出强目标价；若用户要求目标价，只给出需要研究员确认的输入项与可计算路径。
 - 尽量不用 `web_search` / `web_fetch`。只有结构化工具无法覆盖分部收入、订单、客户结构等信息时才使用，并逐条标注来源。
@@ -58,11 +59,27 @@ prerequisites:
 
 **硬规则：有工具数据时禁止标 `[待研究员确认]`**。必须先查 `quality` / `series` / `derived` / `industry_comparison` / `earnings_consensus` / `data_quality`；只有工具确实无数据或需要价值判断时才用下方三级标注。
 
+### 研究报告调取约束（已验证）
+
+用户要求「调取/确认某券商研报的核心假设」时，**不要尝试公开 Web 检索研报 PDF/正文**：
+
+- 东方财富、同花顺、巨潮等平台的研报列表页 API 参数不透明且经常 404/500
+- A 股券商研报 PDF 未对爬虫开放，公开检索成功率极低
+- 即便抓到页面文本，也不含盈利预测模型假设（出货量/单价/成本结构）
+
+改用以下路径，并说明这是反推而非研报原文：
+
+1. **一致预期反推**：用 `earnings_consensus` 目标预测财年的净利中位数 ÷ 营收中位数得隐含净利率，对比最新一期实际净利率，判断卖方假设是否保守。
+2. **分部增速交叉验证**：用 `segments_series.by_type.P.items[].yoy_pct` 的产品线增速反推整体营收增速假设。
+3. **点名同业并排**：用 `industry_comparison.named_peers` 的同业预测增速，对照目标股一致预期是否合理。
+4. **明确交底**：出货量、单价、费用率等无法由工具获取的假设，直接告知用户需研究员手动调阅 PDF 或联系券商，不要用模型记忆补。
+
 ## Metric interpretation rules
 
 读 `stock_valuation_metrics` 时按以下规则解释，不要把单一指标直接等同于高估/低估：
 
 - PS / PS 分位：PS 高低必须配合收入增速与毛利率一起看。高 PS 只有在高增速 + 高毛利时才合理；用 `valuation_percentiles.ps_ttm` 说明“贵/便宜”是相对自身历史，用 `stock_industry_comparison.metrics.market.ps_ttm.peer_percentile` 说明相对同业位置。
+- 自身历史分位、同业横截面分位、申万行业分位三者方向冲突时（如自身极贵但同业极便宜），不要挑一个下结论，要分别解释各自含义并指出哪个是行业贝塔、哪个是公司阿尔法。已验证案例见 `references/three-way-signal-contradictions.md`。
 - 收入增速（`revenue_growth_pct` 与 `series`）：看趋势与稳定性，不只看最新一期。增速是否在 `series` 里持续下滑要明确指出。
 - 研发强度（`rd_intensity_pct`）：高研发强度说明当期利润被研发压制，应提示“用 PS / 调整后利润”而不是直接用 PE。
 - 毛利率 / 净利率：毛利率反映商业模式，净利率受研发/费用影响；二者背离要点出。
@@ -103,10 +120,45 @@ prerequisites:
 - DCF 可作交叉验证：FCFF 多期为正且 `series` 中增速与利润率趋稳。
 - 负 FCF 降权时必须区分性质（依据 `cash_flow.note`）：扩张 capex / 营运资本占用驱动且 EBITDA>0 → 说明「投入期占用」，不得当盈利恶化；EBITDA 亦非正 → 才是真实现金流压力。
 - 任何情况下都不要用银行/保险/证券口径套 FCFF DCF；若标的是金融，直接说明应转 PB-ROE / DDM。
+- 化工/周期股：PB-ROE 与 EV/EBITDA 优先于 DCF，DCF 仅作交叉验证。
+
+## Non-tech stock guidance
+
+`sw_industry` 的申万 L1 不属于科技类时（如 600096.SH 云天化属于基础化工/农化制品），**立即停止**标准估值流程，改输出以下结构：
+
+```markdown
+# {股票代码} 估值框架建议
+
+> 结论边界：本报告仅提供估值框架建议，不构成目标价或买卖建议。
+
+## 公司类型确认
+- 公司：{名称}
+- 申万 L1/L2/L3：{sw_industry}
+- **非科技企业，本 skill 的科技估值框架不适用。**
+
+## 建议估值框架
+- **首选**：PE、PB（重资产/周期）、EV/EBITDA
+- **辅助**：DCF（FCFF 多期为正时可用）
+- **不适用**：PS、研发强度、Rule of 40
+
+## 关键参数（从 stock_valuation_metrics 获取）
+- PE TTM / Forward PE：
+- PB：
+- ROE（最新）：
+- FCFF margin / 正值期数：
+- 同业分位（PE/PB）：
+
+## 下一步
+1. 还原 EBITDA（净利 + 折旧摊销 + 利息支出）
+2. 对标可比同业
+3. 若需深度研判，使用 `悟空，深度分析 {代码}`
+```
+
+关键参数仍用 `stock_valuation_metrics`、`stock_industry_comparison`、`stock_earnings_consensus` 填充，标注规则与本 skill 其余部分一致。
 
 ## Analysis workflow
 
-1. 识别股票与科技子类。若行业明显不是科技，说明本 skill 适用性有限，并转为通用估值框架建议。
+1. 识别股票与科技子类。若 `sw_industry` 的申万 L1 不是科技行业，转「Non-tech stock guidance」，不要继续走下面的步骤。
 2. 调用 `mcp_wukong_quant_read_stock_valuation_metrics` 获取结构化估值指标、`series`、`derived`（含归一化 PE/利润质量告警）、`valuation_percentiles` 与 `data_quality`。
 3. 检查 `quality` 与 `derived.profit_quality_alert`：异常净利率做交叉验证；有告警时改用 `derived.normalized_pe_ttm`。
 4. 检查 `segments_series` 分部同比与 `financial.invest_income_yuan`；投资收益占比过高时降权利润表口径。
