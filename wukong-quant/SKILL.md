@@ -201,7 +201,9 @@ prerequisites:
   - 用户说“进入前十大流通股东”时默认 `new_only=false`；用户明确说“新进”时传 `new_only=true`
   - 用户说“2026 年涨幅没超过 30% / 未超过 30%”时传 `return_start="20260101"`、`max_return_pct=30`
   - 返回 `results`，每条包含：`ts_code`、`name`、`industry`、`holder_name`、`norm_label`、`holder_rank`、`hold_amount`、`hold_ratio`、`hold_ratio_pct`、`hold_ratio_display`、`ann_date`、`end_date`；若使用涨幅过滤，还包含顶层 `return_pct`、`return_pct_display`、`max_return_pct`、`return_start_trade_date`、`return_end_trade_date`，以及详细结构 `range_return`
+  - **重要**：`results[]` 才有 `return_pct`（涨幅数据）；`changes[]` 不含 `return_pct`，只有持仓变化。若要展示涨幅，必须用 `results[]` 而非 `changes[]`
   - 返回 `changes` 与 `change_summary`，对比 `period` 和 `previous_period`（未传则自动取上一报告期），`change_type` 包含 `increased`（增持）、`decreased`（减持）、`unchanged`（不变）、`new`（新进）、`exited`（退出）
+  - 当 `returned_count < matched_count` 时表示有分页限制，需要增大 `limit` 参数获取更多结果（最大 1000）
   - 展示变化时同时列出 `current` 和 `previous`，优先使用 `hold_ratio_chg_display` 表示持股比例百分点变化；例如“高盛较 2025 年报增持 0.20pct”，“摩根士丹利退出前十大流通股东”
   - `hold_ratio` / `hold_ratio_pct` 已经是百分点数值（例如 `0.199` 表示 `0.199%`），不是 0-1 小数；展示时优先使用 `hold_ratio_display`，不要再乘以 100
   - 展示 2026 年涨幅时优先使用 `return_pct_display`；若使用 `return_pct`，它也已经是百分点数值，不要再乘以 100
@@ -255,6 +257,8 @@ filters=[
 ```
 
 ## MCP 服务器要求
+
+> **MCP 断连自愈**：MCP server 若出现 `"is not connected"` 或 `"unreachable after N consecutive failures"` 错误，等待约 30-60 秒后自动恢复，不要立即重试同一工具。切换其他 wukong 工具或继续其他工作，稍后再试。
 
 本技能依赖两个 MCP 服务器：
 
