@@ -38,7 +38,8 @@ prerequisites:
 | 悟空，评分排行 / 悟空，{hs300/a500} 评分 | 查询指定指数评分排行榜 Top N |
 | 悟空，查 {股票代码} 的评分 | 查询单股六维量化评分详情 |
 | 悟空，查 {股票代码} 的科技估值指标 | 查询单股 PS、研发强度、FCFF margin、收入增速等科技估值结构化指标 |
-| 悟空，智能选股 / 财务筛选 {条件} | 多条件财务筛选（营业利润/营收同比、绝对值门槛）附申万行业 |
+| 悟空，强势超跌选股 / 悟空，区间振幅选股 | 加载 `stock-screening` skill，先 `stock_screen_schema` 再 `run_stock_screen` |
+| 悟空，智能选股 / 财务筛选 {条件} | 多条件财务筛选：`mcp_wukong_quant_read_stock_screen` 或 `run_stock_screen`（财务 ScreenSpec） |
 | 悟空，2026Q1 外资投行进入前十大流通股东 | 查询指定报告期高盛/摩根士丹利/瑞银/Barclays 等进入前十大流通股东的股票 |
 | 悟空，外资投行进入前十大流通股东但 2026 年涨幅没超过 30% | 在外资投行股东筛选基础上叠加区间涨幅过滤 |
 | 悟空，查 {股票代码} 的历史分析 | 查最近历史分析 |
@@ -205,7 +206,7 @@ prerequisites:
   - `hold_ratio` / `hold_ratio_pct` 已经是百分点数值（例如 `0.199` 表示 `0.199%`），不是 0-1 小数；展示时优先使用 `hold_ratio_display`，不要再乘以 100
   - 展示 2026 年涨幅时优先使用 `return_pct_display`；若使用 `return_pct`，它也已经是百分点数值，不要再乘以 100
   - 输出时先按 `by_holder` 总结各机构命中数量，再列出股票；结果很多时展示前 30 条并说明 `matched_count`
-- **智能选股（多条件财务筛选）**：调用 `mcp_wukong_quant_read_stock_screen`
+- **智能选股（多条件财务筛选）**：调用 `mcp_wukong_quant_read_stock_screen`（底层已接入通用 ScreeningService；与 `run_stock_screen` 财务 ScreenSpec 等价）
   - 参数：`period`（YYYYMMDD 或 `latest`）、`filters`（JSON 字符串）、`report_type`（1累计/2单季，默认1）、`include_sw_industry`、`exclude_st`、`exclude_negative_base`、`sort_by`、`top_n`
   - 字段白名单：`operate_profit`（营业利润）、`revenue`（主营业务收入，默认）、`total_revenue`（营业总收入）、`n_income`（净利润）、`n_income_attr_p`（归母净利润）、`total_profit`（利润总额）、`oper_cost`（营业成本）
   - 返回：`matched`（命中总数）、`summary.industries_distribution`（申万 L1 分布）、`results[]`（`ts_code`/`name`/`sw_l1`/`sw_l2`/`sw_l3` + 每个 filter 字段的当期值与 YoY）
