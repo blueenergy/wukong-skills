@@ -327,7 +327,7 @@ filters=[
 ### 本地部署：host Hermes CLI
 
 当 Hermes 直接运行在宿主机上（例如终端执行 `hermes`）时，`localhost` 指向宿主机。
-如果 quantFinance compose 已将 MCP 服务端口映射到宿主机，使用：
+如果 `quant-infrastructure/apps/docker-compose.yml` 已将 MCP 服务端口映射到宿主机，使用：
 
 | MCP server | transport | url |
 |------------|-----------|-----|
@@ -339,7 +339,7 @@ filters=[
 
 ### 本地部署：Docker 内 Hermes
 
-当 Hermes 自己也运行在 Docker 容器中，并且与 quantFinance 同在 `quant-network` 时，
+当 Hermes 自己也运行在 Docker 容器中，并且与 `quant-api` / `quant-mcp-*` 同在 `quant-network` 时，
 直接连接两个 MCP 容器：
 
 | MCP server | transport | url |
@@ -355,13 +355,15 @@ filters=[
 
 | 请求头名称 | 值 |
 |------------|----|
-| `X-Hermes-Quant-Key` | 公网服务使用内部密钥；本地部署使用 `quantFinance/.env` 中的 `HERMES_QUANT_INTERNAL_KEY` |
-| `X-User-Token` | 通过 `user_login` 工具获取的 JWT token（可选，仅个人化端点需要） |
+| `X-Hermes-Quant-Key` | 内部密钥。公网服务使用服务端配置的密钥；本地部署取 `quant-infrastructure/apps/env/quant-api.env` 的 `HERMES_QUANT_INTERNAL_KEY` |
+| `X-User-Token` | 通过 `user_login` 工具获取的 JWT token。**个人化端点与组合研究（portfolio-research）端点必填**；不配置时其余只读工具不受影响 |
 
 自签名证书场景可按 Hermes MCP 配置支持情况设置 `ssl_verify=false`。
 
-密钥只从 `quantFinance/.env` 的 `HERMES_QUANT_INTERNAL_KEY` 读取，不要把明文密钥写进
-skill、示例代码或对话记录里。
+`X-Hermes-Quant-Key` 必须与 `quant-api` / `quant-mcp-*` 服务**实际生效的值**一致。本地部署下这三个服务的
+`env_file` 是 `quant-infrastructure/apps/env/common.env` + `env/quant-api.env`（在 `apps/` 目录下，
+被 `.gitignore` 的 `apps/env/*.env` 覆盖，不入库）—— **注意不是 `quantFinance/.env`**。
+密钥只从该处读取，不要把明文密钥写进 skill、示例代码或对话记录里。
 
 ### 工具未注入时的排查顺序
 
