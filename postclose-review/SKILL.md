@@ -30,6 +30,8 @@ prerequisites:
 
 返回 `account`（total_asset / market_value / cash / synced_at）、`positions[]`（symbol / name / qty / avg_price / last_price / market_value / weight / unrealized_pnl）、`equity_history[]`、`data_quality`（含 `warnings`）。不需要本地文件。
 
+管理员可加 `all_accounts=true`：一次返回 `accounts[]`（个人 + 系统策略账户，每户独立一份），非 admin 返回 403。复盘时**分开写**，不要把个人减仓计划和系统策略仓位混在一起。
+
 **V0.1 回退**：本地只读导出，不写库：
 
 ```
@@ -46,7 +48,7 @@ prerequisites:
 
 | 工具 | 用途 | 注意 |
 |------|------|------|
-| `portfolio_snapshot` | 账户/持仓/权益快照 | 先看 `data_quality.warnings`；需要 `X-User-Token` |
+| `portfolio_snapshot` | 账户/持仓/权益快照 | 先看 `data_quality.warnings`；需要 `X-User-Token`；管理员可用 `all_accounts=true` 看全部账户 |
 | `market_summary` | 当日市场总结 | 用 `analysis_date` 对齐交易日 |
 | `ladder_daily` | 连板/情绪 | 只取摘要字段，不要整份塞进上下文 |
 | `market_events_weekly` | 未来事件 | 只取 importance ≥ 3 |
@@ -133,6 +135,7 @@ cost_usd:
 - 输入用 `mcp__wukong-quant-read__portfolio_snapshot`，不再依赖本地 JSON
 - 返回 `account` + `positions` + `equity_history` + `data_as_of` + `data_quality`
 - 工具已内置：`total_asset` 为 0 时按 `market_value + cash` 计算；账户同步过期；`trader_account_equity` 与账户快照差异 > 0.5%；缺失名称（含 ETF 回退 `etf_basic` / `fund_basic`）
+- 管理员 `all_accounts=true`：返回 `accounts[]` + `totals`，每户独立；非 admin 403
 - 调度侧新增：16:10 板块/概念分析、21:30 收盘终值权益快照
 
 ## 关联
