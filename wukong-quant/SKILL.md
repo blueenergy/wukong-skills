@@ -42,6 +42,7 @@ prerequisites:
 | 悟空，智能选股 / 财务筛选 {条件} | 多条件财务筛选：`mcp_wukong_quant_read_stock_screen` 或 `run_stock_screen`（财务 ScreenSpec） |
 | 悟空，2026Q1 外资投行进入前十大流通股东 | 查询指定报告期高盛/摩根士丹利/瑞银/Barclays 等进入前十大流通股东的股票 |
 | 悟空，外资投行进入前十大流通股东但 2026 年涨幅没超过 30% | 在外资投行股东筛选基础上叠加区间涨幅过滤 |
+| 悟空，2026Q3 险资/社保/外资持仓总览 | 按报告期汇总社保/养老金/险资/外资前十大流通股东，含 Top 股票/机构和环比变化 |
 | 悟空，查 {股票代码} 的历史分析 | 查最近历史分析 |
 | 悟空，登录 / 悟空，我要登录 | 用户登录，获取 JWT token 并提示如何配置 |
 | 悟空，我的账户 / 悟空，我的信息 | 查看当前登录用户账户信息 |
@@ -208,6 +209,13 @@ prerequisites:
   - `hold_ratio` / `hold_ratio_pct` 已经是百分点数值（例如 `0.199` 表示 `0.199%`），不是 0-1 小数；展示时优先使用 `hold_ratio_display`，不要再乘以 100
   - 展示 2026 年涨幅时优先使用 `return_pct_display`；若使用 `return_pct`，它也已经是百分点数值，不要再乘以 100
   - 输出时先按 `by_holder` 总结各机构命中数量，再列出股票；结果很多时展示前 30 条并说明 `matched_count`
+- **险资/社保/外资前十大流通股东汇总**：调用 `mcp_wukong_quant_read_institutional_holdings_summary`
+  - 参数：`period`（报告期 YYYYMMDD，如 2026Q3 → `20260930`）、`categories`（逗号分隔；默认 all；可选 `social_security` / `pension` / `insurance` / `foreign_bank` / `foreign_asset_manager` / `hksc`，或中文「社保 / 养老金 / 险资 / 外资 / 北向」）、`previous_period`（可选，默认该期之前最近一期）、`industry`（可选，按 `stock_info.industry` 过滤）、`new_only`（可选，仅 top_stocks 展示较上期新进）、`top_n`（每类 Top 数量，默认 20，最大 100）
+  - 返回：`summary.by_category`（`stocks` / `holders` / `hold_amount_yi` / `net_change_amount_yi` / `new_stocks` / `exited_stocks` / `increased_stocks` / `decreased_stocks`）、`comparison`（`current_stocks` / `previous_stocks` / `previous_coverage_ratio` / `reliable`）、`top_stocks` / `top_exited_stocks` / `top_holders`（按类别分组）、`caveats`
+  - **先看 `comparison.reliable`**：`false` 表示上一期 `top10_floatholders` 覆盖不足，`new_stocks` / `exited_stocks` / `increased_stocks` / `decreased_stocks` 不能当结论。此时只展示当期持仓、Top 机构/股票，并明确提示“上一期覆盖不足，需先回补上一期 top10_floatholders”。
+  - `true` 时才展示环比；金额单位亿元，`hold_ratio_sum` / `hold_float_ratio_sum` 是百分点，不要乘 100。
+  - 口径必须写清：前十大流通股东、金额是下界、季报披露滞后；市值变化含股价影响，不能直接说成增减持金额。
+  - `hksc` 是北向通道，不是单一机构；`foreign` 等于 `foreign_bank + foreign_asset_manager`。
 - **智能选股（多条件财务筛选）**：调用 `mcp_wukong_quant_read_stock_screen`（底层已接入通用 ScreeningService；与 `run_stock_screen` 财务 ScreenSpec 等价）
   - 参数：`period`（YYYYMMDD 或 `latest`）、`filters`（JSON 字符串）、`report_type`（1累计/2单季，默认1）、`include_sw_industry`、`exclude_st`、`exclude_negative_base`、`sort_by`、`top_n`
   - 字段白名单：`operate_profit`（营业利润）、`revenue`（主营业务收入，默认）、`total_revenue`（营业总收入）、`n_income`（净利润）、`n_income_attr_p`（归母净利润）、`total_profit`（利润总额）、`oper_cost`（营业成本）
