@@ -215,6 +215,7 @@ prerequisites:
   - **先看 `comparison.reliable`**：`false` 表示上一期 `top10_floatholders` 覆盖不足，`new_stocks` / `exited_stocks` / `increased_stocks` / `decreased_stocks` 不能当结论。此时只展示当期持仓、Top 机构/股票，并明确提示“上一期覆盖不足，需先回补上一期 top10_floatholders”。
   - `true` 时才展示环比；`hold_shares_yi` 是亿股，`hold_amount_yi` 是股数 × 报告期收盘价估算的亿元市值；`hold_ratio_sum` / `hold_float_ratio_sum` 是百分点，不要乘 100。
   - `top_stocks` / `top_holders` 的 `hold_amount_yi` 为 `null` 时看 `price_missing=true`；退出股票看 `previous_hold_shares_yi` / `previous_hold_amount_yi`。金额变化含股价影响，增减持仍以 `change_ratio_pp` 为准。
+  - `exited` / `top_exited_stocks` 只表示退出前十大流通股东，不等于清仓；可能是掉出前十，实际持仓可能仍低于阈值。
   - 口径必须写清：前十大流通股东、金额是下界、季报披露滞后；市值变化含股价影响，不能直接说成增减持金额。
   - `hksc` 是北向通道，不是单一机构；`foreign` 等于 `foreign_bank + foreign_asset_manager`。
 - **智能选股（多条件财务筛选）**：调用 `mcp_wukong_quant_read_stock_screen`（底层已接入通用 ScreeningService；与 `run_stock_screen` 财务 ScreenSpec 等价）
