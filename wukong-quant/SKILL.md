@@ -211,9 +211,10 @@ prerequisites:
   - 输出时先按 `by_holder` 总结各机构命中数量，再列出股票；结果很多时展示前 30 条并说明 `matched_count`
 - **险资/社保/外资前十大流通股东汇总**：调用 `mcp_wukong_quant_read_institutional_holdings_summary`
   - 参数：`period`（报告期 YYYYMMDD，如 2026Q3 → `20260930`）、`categories`（逗号分隔；默认 all；可选 `social_security` / `pension` / `insurance` / `foreign_bank` / `foreign_asset_manager` / `hksc`，或中文「社保 / 养老金 / 险资 / 外资 / 北向」）、`previous_period`（可选，默认该期之前最近一期）、`industry`（可选，按 `stock_info.industry` 过滤）、`new_only`（可选，仅 top_stocks 展示较上期新进）、`top_n`（每类 Top 数量，默认 20，最大 100）
-  - 返回：`summary.by_category`（`stocks` / `holders` / `hold_amount_yi` / `net_change_amount_yi` / `new_stocks` / `exited_stocks` / `increased_stocks` / `decreased_stocks`）、`comparison`（`current_stocks` / `previous_stocks` / `previous_coverage_ratio` / `reliable`）、`top_stocks` / `top_exited_stocks` / `top_holders`（按类别分组）、`caveats`
+  - 返回：`summary.by_category`（`stocks` / `holders` / `hold_shares_yi` / `hold_amount_yi` / `net_change_shares_yi` / `net_change_amount_yi` / `priced_stocks` / `missing_price_stocks` / `new_stocks` / `exited_stocks` / `increased_stocks` / `decreased_stocks`）、`comparison`（`current_stocks` / `previous_stocks` / `previous_coverage_ratio` / `reliable`）、`top_stocks` / `top_exited_stocks` / `top_holders`（按类别分组）、`caveats`
   - **先看 `comparison.reliable`**：`false` 表示上一期 `top10_floatholders` 覆盖不足，`new_stocks` / `exited_stocks` / `increased_stocks` / `decreased_stocks` 不能当结论。此时只展示当期持仓、Top 机构/股票，并明确提示“上一期覆盖不足，需先回补上一期 top10_floatholders”。
-  - `true` 时才展示环比；金额单位亿元，`hold_ratio_sum` / `hold_float_ratio_sum` 是百分点，不要乘 100。
+  - `true` 时才展示环比；`hold_shares_yi` 是亿股，`hold_amount_yi` 是股数 × 报告期收盘价估算的亿元市值；`hold_ratio_sum` / `hold_float_ratio_sum` 是百分点，不要乘 100。
+  - `top_stocks` / `top_holders` 的 `hold_amount_yi` 为 `null` 时看 `price_missing=true`；退出股票看 `previous_hold_shares_yi` / `previous_hold_amount_yi`。金额变化含股价影响，增减持仍以 `change_ratio_pp` 为准。
   - 口径必须写清：前十大流通股东、金额是下界、季报披露滞后；市值变化含股价影响，不能直接说成增减持金额。
   - `hksc` 是北向通道，不是单一机构；`foreign` 等于 `foreign_bank + foreign_asset_manager`。
 - **智能选股（多条件财务筛选）**：调用 `mcp_wukong_quant_read_stock_screen`（底层已接入通用 ScreeningService；与 `run_stock_screen` 财务 ScreenSpec 等价）
